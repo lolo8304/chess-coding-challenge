@@ -10,8 +10,24 @@ const Piece = {
   ROOK: 5,
   QUEEN: 6,
 
+  PIECES_MASK: 7,
+
   WHITE: 8,
   BLACK: 16,
+
+  COLOR_MASK: 24,
+};
+
+const PieceNames = {
+  0: "None",
+  1: "KING",
+  2: "PAWN",
+  3: "KNIGHT",
+  4: "BISHOP",
+  5: "ROOK",
+  6: "QUEEN",
+  8: "WHITE",
+  16: "BLACK",
 };
 
 const FEN_start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -24,17 +40,23 @@ const FEN_Pieces = {
   q: Piece.QUEEN,
 };
 
+const NOT_SELECTED = -1;
+
 class Board {
   constructor(x, y, w, h) {
     this.BLACK_COLOR = color(125, 148, 92);
     this.WHITE_COLOR = color(235, 235, 211);
+    this.SELECTED_COLOR = color(195, 163, 105);
+    this.LAST_MOVE_COLOR = color(183, 149, 93);
 
     this.h = h;
     this.w = w;
     this.x = x;
     this.y = y;
-    this.squares = new Array(100).fill(0);
-    this.setup(FEN_start);
+    this.squares = new Array(64).fill(0);
+    this.setup();
+    this.selectedIndex = NOT_SELECTED;
+    this.moves = []
   }
 
   draw() {
@@ -49,25 +71,50 @@ class Board {
     }
   }
 
-  pos(gridY, gridX) {
+  toPos(gridY, gridX) {
     return {
       x: this.x + gridX * CELL_SIZE,
       y: this.y + gridY * CELL_SIZE,
     };
   }
+  toGrid(y, x) {
+    if (
+      this.x <= x &&
+      x < this.x + this.w &&
+      this.y <= y &&
+      y < this.y + this.h
+    ) {
+      return {
+        gridX: Math.floor((x - this.x) / CELL_SIZE),
+        gridY: Math.floor((y - this.y) / CELL_SIZE),
+      };
+    } else {
+      return undefined;
+    }
+  }
 
   drawCell(gridY, gridX) {
     const index = gridY * ROW_CELLS + gridX;
-    if ((gridY + gridX) % 2 == 0) {
-      fill(this.WHITE_COLOR);
+    if (this.selectedIndex === index) {
+      fill(this.SELECTED_COLOR);
     } else {
-      fill(this.BLACK_COLOR);
+      const lastMove = this.lastMove();
+      if (this.selectedIndex === -1 && lastMove && (lastMove.from === index || lastMove.to === index)) {
+        fill(this.LAST_MOVE_COLOR);
+      } else {
+        if ((gridY + gridX) % 2 == 0) {
+          fill(this.WHITE_COLOR);
+        } else {
+          fill(this.BLACK_COLOR);
+        }  
+      }
     }
-    const pos = this.pos(gridY, gridX);
+    const pos = this.toPos(gridY, gridX);
     rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     const piece = this.squares[index];
     const isWhite = (piece & Piece.WHITE) > 0;
-    const pieceIndex = (isWhite ? 0 : 1) * Piece.COUNT + (piece & 7) - 1;
+    const pieceIndex =
+      (isWhite ? 0 : 1) * Piece.COUNT + (piece & Piece.PIECES_MASK) - 1;
     if (piece > 0) {
       image(imgFigures[pieceIndex], pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
@@ -81,45 +128,117 @@ class Board {
   // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
   setup(fen) {
     if (!fen) {
-      this.squares[0] = Piece.ROOK | Piece.BLACK;
-      this.squares[1] = Piece.KNIGHT | Piece.BLACK;
-      this.squares[2] = Piece.BISHOP | Piece.BLACK;
-      this.squares[3] = Piece.QUEEN | Piece.BLACK;
-      this.squares[4] = Piece.KING | Piece.BLACK;
-      this.squares[5] = Piece.BISHOP | Piece.BLACK;
-      this.squares[6] = Piece.KNIGHT | Piece.BLACK;
-      this.squares[7] = Piece.ROOK | Piece.BLACK;
-      this.squares[8] = Piece.PAWN | Piece.BLACK;
-
-      this.squares[55] = Piece.PAWN | Piece.WHITE;
-      this.squares[56] = Piece.ROOK | Piece.WHITE;
-      this.squares[57] = Piece.KNIGHT | Piece.WHITE;
-      this.squares[58] = Piece.BISHOP | Piece.WHITE;
-      this.squares[59] = Piece.QUEEN | Piece.WHITE;
-      this.squares[60] = Piece.KING | Piece.WHITE;
-      this.squares[61] = Piece.BISHOP | Piece.WHITE;
-      this.squares[62] = Piece.KNIGHT | Piece.WHITE;
-      this.squares[63] = Piece.ROOK | Piece.WHITE;
-    } else {
-      const fenboard = fen.split(" ")[0];
-      let yIndex = 0;
-      let xIndex = 0;
-      for (let i = 0; i < fenboard.length; i++) {
-        const symbol = fenboard.charCodeAt(i);
-        if (symbol === 47) {
-          // char / == 47
-          yIndex++;
-          xIndex = 0;
-        } else if ((symbol <= 57)) {
-          // char 9 = 57
-          xIndex += (symbol - 48);
-        } else {
-          const pieceColor = symbol >= 97 ? Piece.BLACK : Piece.WHITE;
-          const pieceType = FEN_Pieces[String.fromCharCode(symbol).toLowerCase()];
-          this.squares[yIndex * ROW_CELLS + xIndex] = pieceType | pieceColor;
-          xIndex++;
-        }
+      fen = FEN_start;
+    }
+    const fenboard = fen.split(" ")[0];
+    let yIndex = 0;
+    let xIndex = 0;
+    for (let i = 0; i < fenboard.length; i++) {
+      const symbol = fenboard.charCodeAt(i);
+      if (symbol === 47) {
+        // char / == 47
+        yIndex++;
+        xIndex = 0;
+      } else if (symbol <= 57) {
+        // char 9 = 57
+        xIndex += symbol - 48;
+      } else {
+        const pieceColor = symbol >= 97 ? Piece.BLACK : Piece.WHITE;
+        const pieceType = FEN_Pieces[String.fromCharCode(symbol).toLowerCase()];
+        this.squares[yIndex * ROW_CELLS + xIndex] = pieceType | pieceColor;
+        xIndex++;
       }
     }
+  }
+
+  square(gridY, gridX) {
+    return this.squares[gridY * ROW_CELLS + gridX];
+  }
+
+  piece(gridY, gridX) {
+    return this.square(gridY, gridX) & Piece.PIECES_MASK;
+  }
+  color(gridY, gridX) {
+    return this.square(gridY, gridX) & Piece.COLOR_MASK;
+  }
+  cell(gridY, gridX) {
+    const cell = this.square(gridY, gridX);
+    return {
+      index: gridY * ROW_CELLS + gridX,
+      piece: cell & Piece.PIECES_MASK,
+      color: cell & Piece.COLOR_MASK,
+    };
+  }
+
+  cellToName(cell) {
+    return {
+      index: cell.index,
+      piece: PieceNames[cell.piece],
+      color: PieceNames[cell.color],
+    };
+  }
+
+  isColor(gridY, gridX, color) {
+    return (this.square(gridY, gridX) & color) > 0;
+  }
+
+  cellToString(cell) {
+    return (
+      "Cell: piece=" +
+      cell.piece +
+      ", color=" +
+      cell.color +
+      " index=" +
+      cell.index
+    );
+  }
+
+  clickedToString(clientY, clientX, color) {
+    const grid = this.toGrid(clientY, clientX);
+    if (grid) {
+      const cell = this.cell(grid.gridY, grid.gridX);
+      console.log(this.cellToString(cell));
+      console.log(this.cellToString(this.cellToName(cell)));
+    } else {
+      console.log("Out of board");
+    }
+  }
+
+  clickedCellByColor(clientY, clientX, color) {
+    const grid = this.toGrid(clientY, clientX);
+    if (grid) {
+      const cell = this.cell(grid.gridY, grid.gridX);
+      if (cell.color === color) {
+        return cell;
+      }
+    }
+    return undefined;
+  }
+
+  clickedCell(clientY, clientX) {
+    const grid = this.toGrid(clientY, clientX);
+    if (grid) {
+      return this.cell(grid.gridY, grid.gridX);
+    }
+    return undefined;
+  }
+
+  selectCellIndex(index) {
+    this.selectedIndex = index;
+    console.log("Select index: "+index);
+  }
+
+  lastMove() {
+    return (this.moves.length > 0) ? this.moves[this.moves.length-1] : undefined;
+  }
+
+  makeMove(fromIndex, toIndex) {
+    this.moves.push({
+      from: fromIndex,
+      to: toIndex
+    })
+    this.squares[toIndex] = this.squares[fromIndex]
+    this.squares[fromIndex] = Piece.None
+    this.selectedIndex = -1;
   }
 }

@@ -72,8 +72,8 @@ function reset() {
   isGameFinished = false;
 }
 
-function clickedInCanvas() {
-  return false;
+function clickedInCanvas(event) {
+  return game.clicked(event.clientY, event.clientX);
 }
 
 function getElementByValue(tag, value) {
@@ -115,13 +115,22 @@ function setup() {
     for (let x = 0; x < 6; x++) {
       const figure = createImage(pixels, pixels);
       // The arguments are: source image, source x, source y, source width, source height, dest x, dest y, dest width, dest height
-      figure.copy(imgSprite, pixels * x, pixels * y, pixels, pixels, 0, 0, pixels, pixels);
+      figure.copy(
+        imgSprite,
+        pixels * x,
+        pixels * y,
+        pixels,
+        pixels,
+        0,
+        0,
+        pixels,
+        pixels
+      );
       const index = 6 * y + piecesInImage[x] - 1;
       imgFigures[index] = figure;
-      console.log("Pos: x="+x+" y="+y+" piece="+(piecesInImage[x])+" index="+index)
     }
   }
-  
+
   resizeIfNeeded();
   cnv = createCanvas(W, H);
   cnv.mouseClicked(clickedInCanvas);
@@ -129,7 +138,7 @@ function setup() {
 }
 
 function draw() {
-  background('black');
+  background("black");
   game.draw();
   fill("red");
   rect(W, H);
