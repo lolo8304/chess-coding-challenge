@@ -32,6 +32,8 @@ class Game {
       if (clickedCell.index != selectedIndex) {
         this.board.makeMove(selectedIndex, clickedCell.index);
         this.changeTurn();
+      } else {
+        this.board.selectCellIndex(-1)
       }
     } else {
       const clickedCellForTurn = this.board.clickedCellByColor(
