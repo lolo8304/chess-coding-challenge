@@ -80,6 +80,9 @@ class Board {
     };
   }
   toGrid(y, x) {
+    circle(x, y, 10, "pink");
+    console.log("x: "+this.x + " <= "+x + " < "+ (this.x + this.w));
+    console.log("y: "+this.y + " <= "+y + " < "+ (this.y + this.h));
     if (
       this.x <= x &&
       x < this.x + this.w &&
@@ -128,10 +131,11 @@ class Board {
     if (piece > 0) {
       image(imgFigures[pieceIndex], pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
-    textSize(30);
+    const size = Math.floor(CELL_SIZE / 4);
+    textSize(size);
     fill("red");
     textAlign(LEFT);
-    text("" + index, pos.x+PADDING, pos.y + 30 + PADDING);
+    text("" + index, pos.x + PADDING, pos.y + size + PADDING);
   }
 
   isNumber(str) {

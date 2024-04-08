@@ -1,8 +1,8 @@
 class Game {
   constructor(w, h, padding, paddingTop, paddingBottom) {
-    this.h = h - paddingTop - paddingBottom;
-    this.w = w - 2 * padding;
-    this.x = (W - this.w) / 2.0;
+    this.h = h;
+    this.w = w;
+    this.x = padding;
     this.y = paddingTop;
     this.padding = padding;
     this.paddingTop = paddingTop;
@@ -29,11 +29,11 @@ class Game {
     const selectedIndex = this.board.selectedIndex;
     if (selectedIndex >= 0) {
       const clickedCell = this.board.clickedCell(clientY, clientX);
-      if (clickedCell.index != selectedIndex) {
+      if (clickedCell && clickedCell.index != selectedIndex) {
         this.board.makeMove(selectedIndex, clickedCell.index);
         this.changeTurn();
       } else {
-        this.board.selectCellIndex(-1)
+        this.board.selectCellIndex(-1);
       }
     } else {
       const clickedCellForTurn = this.board.clickedCellByColor(
