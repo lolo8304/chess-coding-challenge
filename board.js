@@ -18,6 +18,8 @@ const Piece = {
   COLOR_MASK: 24,
 };
 
+const SlidingPieces = [Piece.BISHOP, Piece.ROOK, Piece.QUEEN];
+
 const PieceNames = {
   0: "None",
   1: "KING",
@@ -46,8 +48,8 @@ class Board {
   constructor(x, y, w, h) {
     this.BLACK_COLOR = color(125, 148, 92);
     this.WHITE_COLOR = color(235, 235, 211);
-    this.SELECTED_COLOR = color(195, 163, 105);
-    this.LAST_MOVE_COLOR = color(183, 149, 93);
+    this.SELECTED_COLOR = color(183, 149, 93);
+    this.LAST_MOVE_COLOR = color(186, 164, 96);
 
     this.h = h;
     this.w = w;
@@ -56,7 +58,7 @@ class Board {
     this.squares = new Array(64).fill(0);
     this.setup();
     this.selectedIndex = NOT_SELECTED;
-    this.moves = []
+    this.moves = [];
   }
 
   draw() {
@@ -96,17 +98,25 @@ class Board {
   drawCell(gridY, gridX) {
     const index = gridY * ROW_CELLS + gridX;
     if (this.selectedIndex === index) {
-      fill(this.SELECTED_COLOR);
+      fill(this.LAST_MOVE_COLOR);
     } else {
       const lastMove = this.lastMove();
-      if (this.selectedIndex === -1 && lastMove && (lastMove.from === index || lastMove.to === index)) {
-        fill(this.LAST_MOVE_COLOR);
+      if (
+        this.selectedIndex === -1 &&
+        lastMove &&
+        (lastMove.from === index || lastMove.to === index)
+      ) {
+        if (lastMove.from === index) {
+          fill(this.SELECTED_COLOR);
+        } else {
+          fill(this.LAST_MOVE_COLOR);
+        }
       } else {
         if ((gridY + gridX) % 2 == 0) {
           fill(this.WHITE_COLOR);
         } else {
           fill(this.BLACK_COLOR);
-        }  
+        }
       }
     }
     const pos = this.toPos(gridY, gridX);
@@ -118,6 +128,10 @@ class Board {
     if (piece > 0) {
       image(imgFigures[pieceIndex], pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
+    textSize(40);
+    fill("red");
+    textAlign(CENTER);
+    text("" + index, pos.x + CELL_SIZE/2, pos.y + (CELL_SIZE / 3) * 2);
   }
 
   isNumber(str) {
@@ -225,20 +239,61 @@ class Board {
 
   selectCellIndex(index) {
     this.selectedIndex = index;
-    console.log("Select index: "+index);
+    console.log("Select index: " + index);
   }
 
   lastMove() {
-    return (this.moves.length > 0) ? this.moves[this.moves.length-1] : undefined;
+    return this.moves.length > 0
+      ? this.moves[this.moves.length - 1]
+      : undefined;
   }
 
   makeMove(fromIndex, toIndex) {
-    this.moves.push({
-      from: fromIndex,
-      to: toIndex
-    })
-    this.squares[toIndex] = this.squares[fromIndex]
-    this.squares[fromIndex] = Piece.None
+    this.moves.push(new Move(fromIndex, toIndex));
+    this.squares[toIndex] = this.squares[fromIndex];
+    this.squares[fromIndex] = Piece.None;
     this.selectedIndex = -1;
+  }
+  isSlidingPiece(piece) {
+    const pieceOnly = piece | Piece.PIECES_MASK;
+    return pieceOnly === Piece.BISHOP;
+  }
+
+  prepareDirectionOffsets() {
+    this.directionOffsets = [-8, -7, 1, 9, 8, 7, -1, -9];
+    this.distanceToEdge = [];
+    for (let gridY = 0; gridY < ROW_CELLS.length; gridY++) {
+      for (let gridX = 0; gridX < ROW_CELLS.length; gridX++) {
+        numNorth = 7 - gridY;
+        numSouth = gridY;
+        numWest = gridX;
+        numEast = 0;
+      }
+    }
+  }
+}
+
+class Move {
+  constructor(from, to) {
+    this.from = from;
+    this.to = to;
+  }
+}
+
+class LegalMoves {
+  constructor(board) {
+    this.board = board;
+    this.moves = [];
+  }
+
+  generateMoves(color) {
+    for (let start = 0; start < this.board.squares.length; start++) {
+      const piece = this.board.squares[start];
+      if (piece & (color > 0)) {
+        if (SlidingPieces.indexOf(pieceOnly)) {
+          GenerateSlidingMoves(start);
+        }
+      }
+    }
   }
 }
