@@ -9,7 +9,12 @@ class Game {
   }
 
   draw() {
-    this.drawBoad();
+    this.board.draw();
+    textSize(40);
+    fill("white");
+    textAlign(CENTER);
+    const turnText = this.color === Piece.WHITE ? "WHITE's turn" : "BLACK's turn"
+    text(turnText, this.x + this.w/2, this.y + this.h+50);
   }
 
   drawBoad() {
