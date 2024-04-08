@@ -1,9 +1,9 @@
 class Game {
-  constructor(w, h) {
-    this.h = h;
-    this.w = w;
+  constructor(w, h, padding, paddingTop, paddingBottom) {
+    this.h = h - paddingTop - paddingBottom;
+    this.w = w - 2 * padding;
     this.x = (W - this.w) / 2.0;
-    this.y = PADDING;
+    this.y = paddingTop;
     this.board = new Board(this.x, this.y, this.w, this.h);
     this.color = Piece.WHITE;
   }
@@ -14,7 +14,7 @@ class Game {
     fill("white");
     textAlign(CENTER);
     const turnText = this.color === Piece.WHITE ? "WHITE's turn" : "BLACK's turn"
-    text(turnText, this.x + this.w/2, this.y + this.h+50);
+    text(turnText, this.x + this.w/2, this.y-PADDING_TOP+50);
   }
 
   drawBoad() {

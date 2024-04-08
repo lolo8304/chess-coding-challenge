@@ -1,7 +1,8 @@
 let W = 300;
 let H = 500;
 const PADDING = 5;
-const PADDING_BOTTOM = 28 * PADDING;
+const PADDING_TOP = 60+PADDING;
+const PADDING_BOTTOM = PADDING;
 let CELL_SIZE = 20; //px
 const COL_CELLS = 8; // count
 const ROW_CELLS = 8; // count
@@ -55,7 +56,7 @@ function resizeIfNeeded() {
   H = windowHeight;
 
   const cellSizeW = (W - 2 * PADDING) / COL_CELLS_AND_BOUNDARY;
-  const cellSizeH = (H - 2 * PADDING) / ROW_CELLS_AND_BOUNDARY;
+  const cellSizeH = (H - 2 * PADDING-PADDING_BOTTOM-PADDING_TOP) / ROW_CELLS_AND_BOUNDARY;
 
   CELL_SIZE = Math.min(cellSizeH, cellSizeW);
 }
@@ -63,7 +64,10 @@ function resizeIfNeeded() {
 function resizeFinalize() {
   game = new Game(
     CELL_SIZE * COL_CELLS_AND_BOUNDARY,
-    CELL_SIZE * ROW_CELLS_AND_BOUNDARY
+    CELL_SIZE * ROW_CELLS_AND_BOUNDARY,
+    PADDING,
+    PADDING_TOP,
+    PADDING_BOTTOM
   );
 }
 

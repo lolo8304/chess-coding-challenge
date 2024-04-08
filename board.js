@@ -128,10 +128,10 @@ class Board {
     if (piece > 0) {
       image(imgFigures[pieceIndex], pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
-    textSize(40);
+    textSize(30);
     fill("red");
-    textAlign(CENTER);
-    text("" + index, pos.x + CELL_SIZE/2, pos.y + (CELL_SIZE / 3) * 2);
+    textAlign(LEFT);
+    text("" + index, pos.x+PADDING, pos.y + 30 + PADDING);
   }
 
   isNumber(str) {
