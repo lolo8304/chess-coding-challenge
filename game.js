@@ -30,10 +30,12 @@ class Game {
     if (selectedIndex >= 0) {
       const clickedCell = this.board.clickedCell(clientY, clientX);
       if (clickedCell && clickedCell.index != selectedIndex) {
-        this.board.makeMove(selectedIndex, clickedCell.index);
+        this.board.storeMove(selectedIndex, clickedCell.index);
         this.changeTurn();
+        this.board.setLegalMovesFor(this.color);
       } else {
         this.board.selectCellIndex(-1);
+        this.board.setLegalMovesFor(this.color);
       }
     } else {
       const clickedCellForTurn = this.board.clickedCellByColor(
@@ -44,6 +46,7 @@ class Game {
       if (clickedCellForTurn) {
         this.board.clickedToString(clientY, clientX);
         this.board.selectCellIndex(clickedCellForTurn.index);
+        this.board.setLegalMovesFor(this.color);
       }
     }
     return false;
