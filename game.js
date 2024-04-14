@@ -9,6 +9,7 @@ class Game {
     this.paddingBottom = paddingBottom;
     this.board = new Board(this.x, this.y, this.w, this.h);
     this.color = Piece.WHITE;
+    this.board.setLegalMovesFor(this.color);
   }
 
   draw() {

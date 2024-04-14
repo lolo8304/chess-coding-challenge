@@ -34,12 +34,12 @@ const PieceNames = {
 
 const FEN_start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const FEN_Pieces = {
-  k: Piece.KING,
-  p: Piece.PAWN,
-  n: Piece.KNIGHT,
-  b: Piece.BISHOP,
-  r: Piece.ROOK,
-  q: Piece.QUEEN,
+  k: Piece.KING, // könig
+  p: Piece.PAWN, // bauer
+  n: Piece.KNIGHT, // pferd
+  b: Piece.BISHOP, // springer
+  r: Piece.ROOK, // turm
+  q: Piece.QUEEN, // dame
 };
 
 const NOT_SELECTED = -1;
@@ -59,7 +59,7 @@ class Board {
     this.setup();
     this.selectCellIndex(NOT_SELECTED);
     this.mouseCellIndex = NOT_SELECTED;
-    this.moves = [];
+    this.movesHistory = [];
     //                       N   S  W  O  NW SE  NO  SW
     this.directionOffsets = [-8, 8, -1, 1, -9, 9, -7, 7];
     this.distanceToEdge = [];
@@ -67,6 +67,7 @@ class Board {
     this.legalMoves = new LegalMoves(Piece.WHITE, this);
     this.legalMovesForSelectedIndex = [];
     this.legalIndicesForSelectedIndex = [];
+    this.debuggingIndexes = [];
   }
 
   draw() {
@@ -89,7 +90,23 @@ class Board {
         : -1;
   */
 
+  addDebug(move) {
+    this.debuggingIndexes.push(move);
+  }
+
+  debugIndexColor(index) {
+    const found = this.debuggingIndexes.find(
+      (x) => x.from === index || x.to === index || x?.via === index
+    );
+    if (!found) return undefined;
+    if (found.from === index) return "red";
+    if (found.to === index) return "pink";
+    if (found.via === index) return "orange";
+    return "black";
+  }
+
   setLegalMovesFor(color) {
+    this.debuggingIndexes = [];
     const oldLegalMoves = this.legalMoves;
     const newLegalMoves = this.legalMovesFor(color);
     if (oldLegalMoves.color != color || !newLegalMoves.eq(oldLegalMoves)) {
@@ -97,19 +114,30 @@ class Board {
       console.table(this.legalMoves.moves);
     }
     if (this.selectedIndex != NOT_SELECTED) {
-      this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(this.selectedIndex);
+      this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
+        this.selectedIndex
+      );
       this.legalIndicesForSelectedIndex = [];
       for (const move of this.legalMovesForSelectedIndex) {
         this.legalIndicesForSelectedIndex.push(...move.getFromToIndexes());
       }
-      console.log(
-        "Legal moves add-on moves: #" + this.legalMovesForSelectedIndex.length
-      );
+      console.log("Nof legal moves: " + this.legalMovesForSelectedIndex.length);
+      /*
       console.log(
         "Legal indices add-on moves: #" +
           this.legalIndicesForSelectedIndex.length
       );
+      */
     }
+  }
+
+  getPossibleMoveForTargetIndex(index) {
+    if (this.selectedIndex === -1) return undefined;
+    return this.legalMovesForSelectedIndex.find((x) => x.to === index);
+  }
+  hasPossibleMoveForIndex(index) {
+    if (this.selectedIndex != -1) return false;
+    return this.legalMoves.hasAnyMoveForIndex(index);
   }
 
   toPos(gridY, gridX) {
@@ -146,6 +174,8 @@ class Board {
 
   drawCell(gridY, gridX) {
     const index = gridY * ROW_CELLS + gridX;
+    const piece = this.squares[index];
+    const isWhite = (piece & Piece.WHITE) > 0;
 
     if (this.selectedIndex === index) {
       fill(this.LAST_MOVE_COLOR);
@@ -169,20 +199,40 @@ class Board {
         }
       }
     }
+
     const pos = this.toPos(gridY, gridX);
     rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
-    const piece = this.squares[index];
-    const isWhite = (piece & Piece.WHITE) > 0;
+
+    const moveTarget = this.getPossibleMoveForTargetIndex(index);
+    if (moveTarget) {
+      fill("rgba(255, 0, 0, 0.6)");
+      rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
+    }
+
+    const debugColor = this.debugIndexColor(index);
+    if (debugColor) {
+      if (debugColor === "red") fill("rgba(0, 0, 153, 0.4)");
+      if (debugColor === "pink") fill("rgba(0, 255, 255, 0.4)");
+      if (debugColor === "orange") fill("rgba(255, 153, 51, 0.4)");
+      rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
+    }
+
     const pieceIndex =
       (isWhite ? 0 : 1) * Piece.COUNT + (piece & Piece.PIECES_MASK) - 1;
     if (piece > 0) {
+
       image(imgFigures[pieceIndex], pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
     const size = Math.floor(CELL_SIZE / 4);
     textSize(size);
     fill("red");
+    const hasPossibleMove = this.hasPossibleMoveForIndex(index)
+    if (!hasPossibleMove) {
+      fill("rgba(255, 255, 255, 0.4)");
+    }
     textAlign(LEFT);
     text("" + index, pos.x + PADDING, pos.y + size + PADDING);
+
   }
 
   isNumber(str) {
@@ -262,8 +312,8 @@ class Board {
     const grid = this.toGrid(clientY, clientX);
     if (grid) {
       const cell = this.cell(grid.gridY, grid.gridX);
-      console.log(this.cellToString(cell));
-      console.log(this.cellToString(this.cellToName(cell)));
+      //console.log(this.cellToString(cell));
+      //console.log(this.cellToString(this.cellToName(cell)));
     } else {
       console.log("Out of board");
     }
@@ -294,20 +344,28 @@ class Board {
   }
 
   lastMove() {
-    return this.moves.length > 0
-      ? this.moves[this.moves.length - 1]
+    return this.movesHistory.length > 0
+      ? this.movesHistory[this.movesHistory.length - 1]
       : undefined;
   }
 
   storeMove(fromIndex, toIndex) {
-    this.moves.push(new Move(this, fromIndex, toIndex));
+    this.movesHistory.push(new Move(this, fromIndex, toIndex, false));
     this.squares[toIndex] = this.squares[fromIndex];
     this.squares[fromIndex] = Piece.None;
     this.selectCellIndex(NOT_SELECTED);
   }
   isSlidingPiece(piece) {
-    const pieceOnly = piece & Piece.PIECES_MASK;
-    return SlidingPieces.includes(pieceOnly);
+    return SlidingPieces.includes(piece & Piece.PIECES_MASK);
+  }
+  isPawn(piece) {
+    return (piece & Piece.PIECES_MASK) === Piece.PAWN;
+  }
+  isKing(piece) {
+    return (piece & Piece.PIECES_MASK) === Piece.KING;
+  }
+  isKnight(piece) {
+    return (piece & Piece.PIECES_MASK) === Piece.KNIGHT;
   }
 
   prepareDirectionOffsets() {
@@ -323,10 +381,10 @@ class Board {
           numSouth,
           numWest,
           numEast,
-          Math.min(numNorth, numWest),
-          Math.min(numSouth, numEast),
-          Math.min(numNorth, numEast),
-          Math.min(numSouth, numWest),
+          -Math.min(Math.abs(numNorth), Math.abs(numWest)),
+          Math.min(Math.abs(numSouth), Math.abs(numEast)),
+          -Math.min(Math.abs(numNorth), Math.abs(numEast)),
+          Math.min(Math.abs(numSouth), Math.abs(numWest)),
         ];
       }
     }
@@ -338,17 +396,26 @@ class Board {
 }
 
 class Move {
-  constructor(board, from, to) {
+  constructor(board, from, to, isHit = false, via = undefined) {
+    this.colorName = PieceNames[board.squares[from] & Piece.COLOR_MASK];
+    this.pieceName = PieceNames[board.squares[from] & Piece.PIECES_MASK];
     this.board = board;
     this.from = from;
     this.to = to;
+    this.isHit = isHit;
+    this.via = via; // enPassang
   }
 
   eq(other) {
-    return other?.from === this.from && other?.to === this.to;
+    return (
+      other?.from === this.from &&
+      other?.to === this.to &&
+      other?.isHit === this.isHit
+    );
   }
 
   getFromToIndexes() {
+    return [];
     const gridFrom = this.board.indexToGrid(this.from);
     const gridTo = this.board.indexToGrid(this.to);
     const diffY = Math.sign(gridFrom.gridY - gridTo.gridY);
@@ -400,6 +467,17 @@ class LegalMoves {
     return this.moves.filter((x) => x.from === index);
   }
 
+  hasAnyMoveForIndex(index) {
+    return this.moves.find(x => x.from === index) != undefined
+  }
+
+  addMove(move) {
+    //this.board.addDebug(move);
+    if (0 <= move.to && move.to < 64) {
+      this.moves.push(move);
+    }
+  }
+
   generateMoves(color) {
     for (let start = 0; start < this.board.squares.length; start++) {
       const piece = this.board.squares[start];
@@ -407,10 +485,145 @@ class LegalMoves {
       if (ownColor > 0) {
         if (this.board.isSlidingPiece(piece)) {
           this.generateSlidingMoves(start, piece, color);
+        } else if (this.board.isKing(piece)) {
+          this.generateKingMoves(start, piece, color);
+        } else if (this.board.isKnight(piece)) {
+          this.generateKnightMoves(start, piece, color);
+        } else if (this.board.isPawn(piece)) {
+          this.generatePawnMoves(start, piece, color);
         }
       }
     }
     return this;
+  }
+
+  generateKingMoves(startIndex, piece, color) {
+    const oppositeColor = color ^ Piece.COLOR_MASK;
+    for (let i = 0; i < this.board.directionOffsets.length; i++) {
+      const targetIndex = startIndex + this.board.directionOffsets[i];
+      const pieceOnTargetIndex = this.board.squares[targetIndex];
+      const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+      if (pieceOnTargetIndexColor === color) {
+        // skip
+      } else if (pieceOnTargetIndexColor === oppositeColor) {
+        this.addMove(new Move(this.board, startIndex, targetIndex, true));
+      } else {
+        this.addMove(new Move(this.board, startIndex, targetIndex, false));
+      }
+    }
+  }
+  generateKnightMoves(startIndex, piece, color) {
+    //
+    const knightsDirectionOffsetsYX = [
+      [-2, -1],
+      [-2, 1],
+      [2, -1],
+      [2, 1],
+      [-1, -2],
+      [-1, 2],
+      [1, -2],
+      [1, 2],
+    ];
+    const oppositeColor = color ^ Piece.COLOR_MASK;
+    const grid = this.board.indexToGrid(startIndex);
+    for (let i = 0; i < knightsDirectionOffsetsYX.length; i++) {
+      const knightsGridDiff = knightsDirectionOffsetsYX[i];
+      const newY = grid.gridY + knightsGridDiff[0];
+      const newX = grid.gridX + knightsGridDiff[1];
+      if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
+        const targetIndex = newY * 8 + newX;
+        const pieceOnTargetIndex = this.board.squares[targetIndex];
+        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+        if (pieceOnTargetIndexColor === color) {
+          // skip
+        } else if (pieceOnTargetIndexColor === oppositeColor) {
+          this.addMove(new Move(this.board, startIndex, targetIndex, true));
+        } else {
+          this.addMove(new Move(this.board, startIndex, targetIndex, false));
+        }
+      }
+    }
+  }
+  generatePawnMoves(startIndex, piece, color) {
+    const startPawnIndex = (color & Piece.WHITE) > 0 ? 6 : 1;
+    const directionOffsetY = (color & Piece.WHITE) > 0 ? -1 : 1;
+
+    const pieceOnly = piece & Piece.PIECES_MASK;
+    const pieceColor = piece & Piece.COLOR_MASK;
+    const oppositeColor = color ^ Piece.COLOR_MASK;
+    const grid = this.board.indexToGrid(startIndex);
+    // move 2
+    if (grid.gridY === startPawnIndex) {
+      const newY = grid.gridY + 2 * directionOffsetY;
+      const newX = grid.gridX;
+      if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
+        const targetIndex = newY * 8 + newX;
+        if (0 <= targetIndex && targetIndex < 64) {
+          const pieceOnTargetIndex = this.board.squares[targetIndex];
+          const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+          if (pieceOnTargetIndexColor === 0) {
+            const newMove = new Move(
+              this.board,
+              startIndex,
+              targetIndex,
+              false
+            );
+            this.addMove(newMove);
+          }
+        }
+      }
+    }
+    // move normal: 1
+    let newY = grid.gridY + directionOffsetY;
+    let newX = grid.gridX;
+    if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
+      const targetIndex = newY * 8 + newX;
+      if (0 <= targetIndex && targetIndex < 64) {
+        const pieceOnTargetIndex = this.board.squares[targetIndex];
+        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+        if (pieceOnTargetIndexColor === 0) {
+          const newMove = new Move(this.board, startIndex, targetIndex, false);
+          this.addMove(newMove);
+        }
+      }
+    }
+
+    // hit rule left
+    const directionsX = [-1, 1];
+    for (const dirX of directionsX) {
+      newY = grid.gridY + directionOffsetY;
+      newX = grid.gridX + dirX;
+      if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
+        const targetIndex = newY * 8 + newX;
+        const pieceOnTargetIndex = this.board.squares[targetIndex];
+        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+        if (pieceOnTargetIndexColor === oppositeColor) {
+          this.addMove(new Move(this.board, startIndex, targetIndex, true));
+          const newMove = new Move(this.board, startIndex, targetIndex, true);
+          this.addMove(newMove);
+        } else if (pieceOnTargetIndexColor === 0) {
+          // check for en-passang
+          newY = grid.gridY;
+          newX = grid.gridX + dirX;
+          if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
+            const targetEnPIndex = newY * 8 + newX;
+            const pieceEnPOnTargetIndex = this.board.squares[targetEnPIndex];
+            const pieceEnPOnTargetIndexColor =
+              pieceEnPOnTargetIndex & Piece.COLOR_MASK;
+            if (pieceEnPOnTargetIndexColor === oppositeColor) {
+              const newMove = new Move(
+                this.board,
+                startIndex,
+                targetIndex,
+                true,
+                targetEnPIndex
+              );
+              this.addMove(newMove);
+            }
+          }
+        }
+      }
+    }
   }
 
   generateSlidingMoves(startIndex, piece, color) {
@@ -424,23 +637,31 @@ class LegalMoves {
       directionIndex < endDirIndex;
       directionIndex++
     ) {
-      for (
-        let n = 0;
-        n < this.board.distanceToEdge[startIndex][directionIndex];
-        n++
-      ) {
+      const distanceToTarget =
+        this.board.distanceToEdge[startIndex][directionIndex];
+      let n = 0;
+      const inc = Math.sign(distanceToTarget);
+      do {
         const targetIndex =
-          startIndex + this.board.directionOffsets[directionIndex] * (n + 1);
-        const pieceOnTargetIndex = this.board.squares[targetIndex];
-        const pieceOnTargetIndexColor = pieceOnTargetIndex & color;
-        if (pieceOnTargetIndexColor === color) {
+          startIndex +
+          this.board.directionOffsets[directionIndex] * (Math.abs(n) + 1);
+        if (0 <= targetIndex && targetIndex < 64) {
+          const pieceOnTargetIndex = this.board.squares[targetIndex];
+          const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+          if (pieceOnTargetIndexColor === color) {
+            break;
+          }
+          if (pieceOnTargetIndexColor === oppositeColor) {
+            this.addMove(new Move(this.board, startIndex, targetIndex, true));
+            break;
+          } else {
+            this.addMove(new Move(this.board, startIndex, targetIndex, false));
+          }
+        } else {
           break;
         }
-        this.moves.push(new Move(this.board, startIndex, targetIndex));
-        if (pieceOnTargetIndexColor === oppositeColor) {
-          break;
-        }
-      }
+        n = n + inc;
+      } while (inc === 1 ? n < distanceToTarget : n > distanceToTarget);
     }
   }
 }
