@@ -349,10 +349,13 @@ class Board {
       : undefined;
   }
 
-  storeMove(fromIndex, toIndex) {
-    this.movesHistory.push(new Move(this, fromIndex, toIndex, false));
-    this.squares[toIndex] = this.squares[fromIndex];
-    this.squares[fromIndex] = Piece.None;
+  storeMove(move) {
+    this.movesHistory.push(move);
+    this.squares[move.to] = this.squares[move.from];
+    this.squares[move.from] = Piece.None;
+    if (move.via) {
+      this.squares[move.via] = Piece.None;
+    }
     this.selectCellIndex(NOT_SELECTED);
   }
   isSlidingPiece(piece) {
