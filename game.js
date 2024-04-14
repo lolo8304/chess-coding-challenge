@@ -10,6 +10,8 @@ class Game {
     this.board = new Board(this.x, this.y, this.w, this.h);
     this.color = Piece.WHITE;
     this.board.setLegalMovesFor(this.color);
+    this.computerBlack = new ComputerPlayer(this.board, Piece.BLACK).on()
+    this.computerWhite = new ComputerPlayer(this.board, Piece.WHITE).off()
   }
 
   draw() {
@@ -20,6 +22,12 @@ class Game {
     const turnText =
       this.color === Piece.WHITE ? "WHITE's turn" : "BLACK's turn";
     text(turnText, this.x + this.w / 2, this.y - this.paddingTop + 50);
+    if (this.computerBlack.shallRunNext()) {
+      this.computerMove(this.computerBlack)
+    }
+    if (this.computerWhite.shallRunNext()) {
+      this.computerMove(this.computerWhite)
+    }
   }
 
   drawBoad() {
@@ -35,6 +43,7 @@ class Game {
         this.board.storeMove(validMove);
         this.changeTurn();
         this.board.setLegalMovesFor(this.color);
+        this.computerMoveBlack();
       } else {
         this.board.selectCellIndex(-1);
         this.board.setLegalMovesFor(this.color);
@@ -57,5 +66,24 @@ class Game {
 
   changeTurn() {
     this.color = this.color === Piece.WHITE ? Piece.BLACK : Piece.WHITE;
+  }
+
+  computerMoveBlack() {
+    if (this.computerBlack.isOn() && this.computerBlack.isTurn(this.color)) {
+      // skip
+    }
+  }
+  computerMoveWhite() {
+    if (this.computerWhite.isOn() && this.v.isTurn(this.color)) {
+      this.computerMove(this.computerWhite)
+    }
+  }
+  computerMove(computer) {
+    const computerMove = computer.chooseMove();
+    if (computerMove) {
+      this.board.storeMove(computerMove);
+      this.changeTurn();
+      this.board.setLegalMovesFor(this.color);
+    }
   }
 }

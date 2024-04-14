@@ -220,19 +220,17 @@ class Board {
     const pieceIndex =
       (isWhite ? 0 : 1) * Piece.COUNT + (piece & Piece.PIECES_MASK) - 1;
     if (piece > 0) {
-
       image(imgFigures[pieceIndex], pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
     const size = Math.floor(CELL_SIZE / 4);
     textSize(size);
     fill("red");
-    const hasPossibleMove = this.hasPossibleMoveForIndex(index)
+    const hasPossibleMove = this.hasPossibleMoveForIndex(index);
     if (!hasPossibleMove) {
       fill("rgba(255, 255, 255, 0.4)");
     }
     textAlign(LEFT);
     text("" + index, pos.x + PADDING, pos.y + size + PADDING);
-
   }
 
   isNumber(str) {
@@ -471,7 +469,7 @@ class LegalMoves {
   }
 
   hasAnyMoveForIndex(index) {
-    return this.moves.find(x => x.from === index) != undefined
+    return this.moves.find((x) => x.from === index) != undefined;
   }
 
   addMove(move) {
@@ -666,5 +664,50 @@ class LegalMoves {
         n = n + inc;
       } while (inc === 1 ? n < distanceToTarget : n > distanceToTarget);
     }
+  }
+}
+
+class ComputerPlayer {
+  constructor(board, color) {
+    this.board = board;
+    this.color = color;
+    this._isOn = false;
+    this.runNext = false;
+  }
+
+  isTurn(color) {
+    if (!this._isOn) return false;
+    const turn = this.color === color;
+    this.runNext = turn;
+    return turn
+  }
+
+  shallRunNext() {
+    return this.runNext
+  }
+
+  chooseMove() {
+    if (this.board.legalMoves.color === this.color) {
+      return this.bestMove(this.board.legalMoves);
+    }
+    this.runNext = false
+    return undefined;
+  }
+
+  bestMove(legalMoves) {
+    const randomMove = Math.floor(random(legalMoves.moves.length));
+    return legalMoves.moves[randomMove];
+  }
+
+  on() {
+    this._isOn = true;
+    return this
+  }
+  off() {
+    this._isOn = false;
+    return this
+  }
+  isOn() {
+    return this._isOn;
   }
 }
