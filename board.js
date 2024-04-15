@@ -529,7 +529,7 @@ class LegalMoves {
 
   generateCastlingKings(startIndex, piece, color) {
     if (this.board.hasMoved(piece)) return;
-    const rookPiece = Piece.ROOK & color;
+    const rookPiece = Piece.ROOK | color;
     const rookPositions = color === Piece.WHITE ? [56, 63] : [0, 7];
 
     const rookLongMoved = this.board.hasMovedFromIndex(
