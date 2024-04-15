@@ -354,6 +354,10 @@ class Board {
     if (move.via) {
       this.squares[move.via] = Piece.None;
     }
+    if (move.castlingKingTargetIndex) {
+      this.squares[move.castlingRookTargetIndex] = this.squares[move.castlingRookStartIndex];
+      this.squares[move.castlingRookStartIndex] = Piece.None;
+    }
     this.selectCellIndex(NOT_SELECTED);
   }
   isSlidingPiece(piece) {
@@ -369,6 +373,11 @@ class Board {
     return (piece & Piece.PIECES_MASK) === Piece.KNIGHT;
   }
 
+  checkBoardToEdges(distanceToEdgeCount) {
+    if (distanceToEdgeCount === 0) return undefined;
+    return distanceToEdgeCount;
+  }
+
   prepareDirectionOffsets() {
     for (let gridY = 0; gridY < ROW_CELLS; gridY++) {
       for (let gridX = 0; gridX < ROW_CELLS; gridX++) {
@@ -377,15 +386,20 @@ class Board {
         const numWest = -gridX;
         const numEast = 7 - gridX;
         const index = gridY * 8 + gridX;
+
+        const NW = -Math.min(Math.abs(numNorth), Math.abs(numWest));
+        const SE = Math.min(Math.abs(numSouth), Math.abs(numEast));
+        const NE = -Math.min(Math.abs(numNorth), Math.abs(numEast));
+        const SW = Math.min(Math.abs(numSouth), Math.abs(numWest));
         this.distanceToEdge[index] = [
-          numNorth,
-          numSouth,
-          numWest,
-          numEast,
-          -Math.min(Math.abs(numNorth), Math.abs(numWest)),
-          Math.min(Math.abs(numSouth), Math.abs(numEast)),
-          -Math.min(Math.abs(numNorth), Math.abs(numEast)),
-          Math.min(Math.abs(numSouth), Math.abs(numWest)),
+          this.checkBoardToEdges(numNorth),
+          this.checkBoardToEdges(numSouth),
+          this.checkBoardToEdges(numWest),
+          this.checkBoardToEdges(numEast),
+          this.checkBoardToEdges(NW),
+          this.checkBoardToEdges(SE),
+          this.checkBoardToEdges(NE),
+          this.checkBoardToEdges(SW),
         ];
       }
     }
@@ -394,17 +408,31 @@ class Board {
   legalMovesFor(color) {
     return new LegalMoves(color, this).generateMoves(color);
   }
+
+  hasMoved(piece) {
+    return this.movesHistory.find((x) => x.piece === piece) != undefined;
+  }
+  hasMovedFromIndex(piece, index) {
+    return (
+      this.movesHistory.find((x) => x.piece === piece && x.from === index) !=
+      undefined
+    );
+  }
 }
 
 class Move {
-  constructor(board, from, to, isHit = false, via = undefined) {
+  constructor(board, from, to, isHit = false, via = undefined, castlingKingTargetIndex = undefined, castlingRookStartIndex = undefined, castlingRookTargetIndex = undefined) {
     this.colorName = PieceNames[board.squares[from] & Piece.COLOR_MASK];
     this.pieceName = PieceNames[board.squares[from] & Piece.PIECES_MASK];
+    this.piece = board.squares[from];
     this.board = board;
     this.from = from;
     this.to = to;
     this.isHit = isHit;
     this.via = via; // enPassang
+    this.castlingKingTargetIndex = castlingKingTargetIndex; // castling king - king position
+    this.castlingRookStartIndex = castlingRookStartIndex; // castling king - rook position start
+    this.castlingRookTargetIndex = castlingRookTargetIndex; // castling king - rook position target
   }
 
   eq(other) {
@@ -488,6 +516,7 @@ class LegalMoves {
           this.generateSlidingMoves(start, piece, color);
         } else if (this.board.isKing(piece)) {
           this.generateKingMoves(start, piece, color);
+          this.generateCastlingKings(start, piece, color);
         } else if (this.board.isKnight(piece)) {
           this.generateKnightMoves(start, piece, color);
         } else if (this.board.isPawn(piece)) {
@@ -496,6 +525,71 @@ class LegalMoves {
       }
     }
     return this;
+  }
+
+  generateCastlingKings(startIndex, piece, color) {
+    if (this.board.hasMoved(piece)) return;
+    const rookPiece = Piece.ROOK & color;
+    const rookPositions = color === Piece.WHITE ? [56, 63] : [0, 7];
+
+    const rookLongMoved = this.board.hasMovedFromIndex(
+      rookPiece,
+      rookPositions[0]
+    );
+    if (!rookLongMoved) {
+      let isEmpty = true;
+      for (let index = rookPositions[0] + 1; index < startIndex; index++) {
+        const shouldBeEmptyPiece = this.board.squares[index];
+        if (shouldBeEmptyPiece != 0) {
+          isEmpty = false;
+          break;
+        }
+      }
+      if (isEmpty) {
+        const targetIndex = rookPositions[0] + 2;
+        const newMove = new Move(
+          this.board,
+          startIndex,
+          targetIndex,
+          false,
+          undefined,
+          targetIndex,
+          rookPositions[0],
+          targetIndex + 1
+        );
+        this.addMove(newMove);
+      }
+    }
+
+    const rookShortMoved = this.board.hasMovedFromIndex(
+      rookPiece,
+      rookPositions[1]
+    );
+    if (!rookShortMoved) {
+      let isEmpty = true;
+      for (let index = startIndex + 1; index < rookPositions[1]; index++) {
+        const shouldBeEmptyPiece = this.board.squares[index];
+        if (shouldBeEmptyPiece != 0) {
+          isEmpty = false;
+          break;
+        }
+      }
+      if (isEmpty) {
+        const targetIndex = startIndex + 2;
+        const newMove = new Move(
+          this.board,
+          startIndex,
+          targetIndex,
+          false,
+          undefined,
+          targetIndex,
+          rookPositions[1],
+          targetIndex - 1
+        );
+        this.addMove(newMove);
+      }
+    }
+
   }
 
   generateKingMoves(startIndex, piece, color) {
@@ -640,29 +734,34 @@ class LegalMoves {
     ) {
       const distanceToTarget =
         this.board.distanceToEdge[startIndex][directionIndex];
-      let n = 0;
-      const inc = Math.sign(distanceToTarget);
-      do {
-        const targetIndex =
-          startIndex +
-          this.board.directionOffsets[directionIndex] * (Math.abs(n) + 1);
-        if (0 <= targetIndex && targetIndex < 64) {
-          const pieceOnTargetIndex = this.board.squares[targetIndex];
-          const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
-          if (pieceOnTargetIndexColor === color) {
-            break;
-          }
-          if (pieceOnTargetIndexColor === oppositeColor) {
-            this.addMove(new Move(this.board, startIndex, targetIndex, true));
-            break;
+      if (distanceToTarget) {
+        let n = 0;
+        const inc = Math.sign(distanceToTarget);
+        do {
+          const targetIndex =
+            startIndex +
+            this.board.directionOffsets[directionIndex] * (Math.abs(n) + 1);
+          if (0 <= targetIndex && targetIndex < 64) {
+            const pieceOnTargetIndex = this.board.squares[targetIndex];
+            const pieceOnTargetIndexColor =
+              pieceOnTargetIndex & Piece.COLOR_MASK;
+            if (pieceOnTargetIndexColor === color) {
+              break;
+            }
+            if (pieceOnTargetIndexColor === oppositeColor) {
+              this.addMove(new Move(this.board, startIndex, targetIndex, true));
+              break;
+            } else {
+              this.addMove(
+                new Move(this.board, startIndex, targetIndex, false)
+              );
+            }
           } else {
-            this.addMove(new Move(this.board, startIndex, targetIndex, false));
+            break;
           }
-        } else {
-          break;
-        }
-        n = n + inc;
-      } while (inc === 1 ? n < distanceToTarget : n > distanceToTarget);
+          n = n + inc;
+        } while (inc === 1 ? n < distanceToTarget : n > distanceToTarget);
+      }
     }
   }
 }
@@ -679,18 +778,18 @@ class ComputerPlayer {
     if (!this._isOn) return false;
     const turn = this.color === color;
     this.runNext = turn;
-    return turn
+    return turn;
   }
 
   shallRunNext() {
-    return this.runNext
+    return this.runNext;
   }
 
   chooseMove() {
     if (this.board.legalMoves.color === this.color) {
       return this.bestMove(this.board.legalMoves);
     }
-    this.runNext = false
+    this.runNext = false;
     return undefined;
   }
 
@@ -701,11 +800,11 @@ class ComputerPlayer {
 
   on() {
     this._isOn = true;
-    return this
+    return this;
   }
   off() {
     this._isOn = false;
-    return this
+    return this;
   }
   isOn() {
     return this._isOn;
