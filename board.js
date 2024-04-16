@@ -33,6 +33,7 @@ const PieceNames = {
 };
 
 const FEN_start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+//const FEN_start = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
 const FEN_Pieces = {
   k: Piece.KING, // könig
   p: Piece.PAWN, // bauer
@@ -65,9 +66,10 @@ class Board {
     this.distanceToEdge = [];
     this.prepareDirectionOffsets();
     this.legalMoves = new LegalMoves(Piece.WHITE, this);
+    this.opponentLegalMoves = new LegalMoves(Piece.BLACK, this);
     this.legalMovesForSelectedIndex = [];
-    this.legalIndicesForSelectedIndex = [];
     this.debuggingIndexes = [];
+    this.check = false;
   }
 
   draw() {
@@ -95,39 +97,49 @@ class Board {
   }
 
   debugIndexColor(index) {
+    //return this.debugIndexColorAll(index)
+    return this.debugIndexColorTarget(index);
+  }
+
+  debugIndexColorAll(index) {
     const found = this.debuggingIndexes.find(
       (x) => x.from === index || x.to === index || x?.via === index
     );
     if (!found) return undefined;
-    if (found.from === index) return "red";
-    if (found.to === index) return "pink";
+    if (found.from === index) return "blue";
+    if (found.to === index) return "cyan";
     if (found.via === index) return "orange";
     return "black";
   }
 
+  debugIndexColorTarget(index) {
+    const found = this.debuggingIndexes.find((x) => x.to === index);
+    if (!found) return undefined;
+    if (found.to === index) return "red";
+    return "black";
+  }
+
   setLegalMovesFor(color) {
+    this.check = false;
+    const opponentColor = color ^ Piece.COLOR_MASK;
     this.debuggingIndexes = [];
     const oldLegalMoves = this.legalMoves;
     const newLegalMoves = this.legalMovesFor(color);
     if (oldLegalMoves.color != color || !newLegalMoves.eq(oldLegalMoves)) {
       this.legalMoves = newLegalMoves;
+      this.opponentLegalMoves = this.legalMovesFor(opponentColor);
       console.table(this.legalMoves.moves);
     }
     if (this.selectedIndex != NOT_SELECTED) {
       this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
         this.selectedIndex
       );
-      this.legalIndicesForSelectedIndex = [];
-      for (const move of this.legalMovesForSelectedIndex) {
-        this.legalIndicesForSelectedIndex.push(...move.getFromToIndexes());
-      }
-      console.log("Nof legal moves: " + this.legalMovesForSelectedIndex.length);
-      /*
-      console.log(
-        "Legal indices add-on moves: #" +
-          this.legalIndicesForSelectedIndex.length
-      );
-      */
+    }
+    //for (const move of this.opponentLegalMoves.moves) {
+    //  this.debuggingIndexes.push(move);
+    //}
+    if (this.amIunderCheck()) {
+      this.check = true;
     }
   }
 
@@ -211,8 +223,9 @@ class Board {
 
     const debugColor = this.debugIndexColor(index);
     if (debugColor) {
-      if (debugColor === "red") fill("rgba(0, 0, 153, 0.4)");
-      if (debugColor === "pink") fill("rgba(0, 255, 255, 0.4)");
+      if (debugColor === "red") fill("rgba(255, 0, 0, 0.4)");
+      if (debugColor === "blue") fill("rgba(0, 0, 153, 0.4)");
+      if (debugColor === "cyan") fill("rgba(0, 255, 255, 0.4)");
       if (debugColor === "orange") fill("rgba(255, 153, 51, 0.4)");
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
@@ -355,7 +368,8 @@ class Board {
       this.squares[move.via] = Piece.None;
     }
     if (move.castlingKingTargetIndex) {
-      this.squares[move.castlingRookTargetIndex] = this.squares[move.castlingRookStartIndex];
+      this.squares[move.castlingRookTargetIndex] =
+        this.squares[move.castlingRookStartIndex];
       this.squares[move.castlingRookStartIndex] = Piece.None;
     }
     this.selectCellIndex(NOT_SELECTED);
@@ -418,10 +432,34 @@ class Board {
       undefined
     );
   }
+
+  indexesOfPiece(piece) {
+    const pieceOnly = piece & Piece.PIECES_MASK;
+    return this.squares.filter((x) => (x & Piece.PIECES_MASK) === pieceOnly);
+  }
+  anyOfPiece(piece) {
+    for (let i = 0; i < this.squares.length; i++) {
+      if (this.squares[i] === piece) return i;
+    }
+    return undefined;
+  }
+
+  amIunderCheck() {
+    return this.opponentLegalMoves.hasMoveForMyKing();
+  }
 }
 
 class Move {
-  constructor(board, from, to, isHit = false, via = undefined, castlingKingTargetIndex = undefined, castlingRookStartIndex = undefined, castlingRookTargetIndex = undefined) {
+  constructor(
+    board,
+    from,
+    to,
+    isHit = false,
+    via = undefined,
+    castlingKingTargetIndex = undefined,
+    castlingRookStartIndex = undefined,
+    castlingRookTargetIndex = undefined
+  ) {
     this.colorName = PieceNames[board.squares[from] & Piece.COLOR_MASK];
     this.pieceName = PieceNames[board.squares[from] & Piece.PIECES_MASK];
     this.piece = board.squares[from];
@@ -497,7 +535,10 @@ class LegalMoves {
   }
 
   hasAnyMoveForIndex(index) {
-    return this.moves.find((x) => x.from === index) != undefined;
+    return this.getMovesFrom(index).length > 0;
+  }
+  hasAnyMoveToIndex(index) {
+    return this.getMovesTo(index).length > 0;
   }
 
   addMove(move) {
@@ -505,6 +546,15 @@ class LegalMoves {
     if (0 <= move.to && move.to < 64) {
       this.moves.push(move);
     }
+  }
+
+  hasMoveForMyKing() {
+    const opponentColor = this.color ^ Piece.COLOR_MASK
+    const index = this.board.anyOfPiece(
+      Piece.KING | opponentColor
+    );
+    console.log("Index of my KING ("+PieceNames[opponentColor]+")="+index)
+    return this.hasAnyMoveToIndex(index)
   }
 
   generateMoves(color) {
@@ -589,7 +639,6 @@ class LegalMoves {
         this.addMove(newMove);
       }
     }
-
   }
 
   generateKingMoves(startIndex, piece, color) {

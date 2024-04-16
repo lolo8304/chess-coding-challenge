@@ -10,8 +10,8 @@ class Game {
     this.board = new Board(this.x, this.y, this.w, this.h);
     this.color = Piece.WHITE;
     this.board.setLegalMovesFor(this.color);
-    this.computerBlack = new ComputerPlayer(this.board, Piece.BLACK).on()
-    this.computerWhite = new ComputerPlayer(this.board, Piece.WHITE).off()
+    this.computerBlack = new ComputerPlayer(this.board, Piece.BLACK).on();
+    this.computerWhite = new ComputerPlayer(this.board, Piece.WHITE).off();
   }
 
   draw() {
@@ -19,14 +19,16 @@ class Game {
     textSize(40);
     fill("white");
     textAlign(CENTER);
-    const turnText =
-      this.color === Piece.WHITE ? "WHITE's turn" : "BLACK's turn";
+    let turnText = this.color === Piece.WHITE ? "WHITE's turn" : "BLACK's turn";
+    if (this.board.check) {
+      turnText += " CHECK";
+    }
     text(turnText, this.x + this.w / 2, this.y - this.paddingTop + 50);
     if (this.computerBlack.shallRunNext()) {
-      this.computerMove(this.computerBlack)
+      this.computerMove(this.computerBlack);
     }
     if (this.computerWhite.shallRunNext()) {
-      this.computerMove(this.computerWhite)
+      this.computerMove(this.computerWhite);
     }
   }
 
@@ -38,7 +40,9 @@ class Game {
     const selectedIndex = this.board.selectedIndex;
     if (selectedIndex >= 0) {
       const clickedCell = this.board.clickedCell(clientY, clientX);
-      const validMove = this.board.getPossibleMoveForTargetIndex(clickedCell.index)
+      const validMove = this.board.getPossibleMoveForTargetIndex(
+        clickedCell.index
+      );
       if (clickedCell && clickedCell.index != selectedIndex && validMove) {
         this.board.storeMove(validMove);
         this.changeTurn();
@@ -54,11 +58,15 @@ class Game {
         clientX,
         this.color
       );
-      const validMove = this.board.hasPossibleMoveForIndex(clickedCellForTurn.index)
-      if (clickedCellForTurn && validMove) {
-        this.board.clickedToString(clientY, clientX);
-        this.board.selectCellIndex(clickedCellForTurn.index);
-        this.board.setLegalMovesFor(this.color);
+      if (clickedCellForTurn) {
+        const validMove = this.board.hasPossibleMoveForIndex(
+          clickedCellForTurn.index
+        );
+        if (clickedCellForTurn && validMove) {
+          this.board.clickedToString(clientY, clientX);
+          this.board.selectCellIndex(clickedCellForTurn.index);
+          this.board.setLegalMovesFor(this.color);
+        }
       }
     }
     return false;
@@ -75,7 +83,7 @@ class Game {
   }
   computerMoveWhite() {
     if (this.computerWhite.isOn() && this.v.isTurn(this.color)) {
-      this.computerMove(this.computerWhite)
+      this.computerMove(this.computerWhite);
     }
   }
   computerMove(computer) {
