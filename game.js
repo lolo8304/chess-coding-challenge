@@ -8,10 +8,12 @@ class Game {
     this.paddingTop = paddingTop;
     this.paddingBottom = paddingBottom;
     this.board = new Board(this.x, this.y, this.w, this.h);
+
     this.color = Piece.WHITE;
-    this.board.setLegalMovesFor(this.color);
-    this.computerBlack = new ComputerPlayer(this.board, Piece.BLACK).on();
-    this.computerWhite = new ComputerPlayer(this.board, Piece.WHITE).off();
+    this.board.data.setLegalMovesFor(this.color);
+
+    this.computerBlack = new ComputerPlayer(this.board.data, Piece.BLACK).on();
+    this.computerWhite = new ComputerPlayer(this.board.data, Piece.WHITE).off();
   }
 
   draw() {
@@ -36,8 +38,9 @@ class Game {
     this.board.draw();
   }
 
+
   clicked(clientY, clientX) {
-    const selectedIndex = this.board.selectedIndex;
+    const selectedIndex = this.board.data.selectedIndex;
     if (selectedIndex >= 0) {
       const clickedCell = this.board.clickedCell(clientY, clientX);
       const validMove = this.board.getPossibleMoveForTargetIndex(
@@ -46,11 +49,11 @@ class Game {
       if (clickedCell && clickedCell.index != selectedIndex && validMove) {
         this.board.storeMove(validMove);
         this.changeTurn();
-        this.board.setLegalMovesFor(this.color);
+        this.board.data.setLegalMovesFor(this.color);
         this.computerMoveBlack();
       } else {
-        this.board.selectCellIndex(-1);
-        this.board.setLegalMovesFor(this.color);
+        this.board.selectCellIndex(NOT_SELECTED);
+        this.board.data.setLegalMovesFor(this.color);
       }
     } else {
       const clickedCellForTurn = this.board.clickedCellByColor(
@@ -65,7 +68,7 @@ class Game {
         if (clickedCellForTurn && validMove) {
           this.board.clickedToString(clientY, clientX);
           this.board.selectCellIndex(clickedCellForTurn.index);
-          this.board.setLegalMovesFor(this.color);
+          this.board.data.setLegalMovesFor(this.color);
         }
       }
     }
@@ -91,7 +94,7 @@ class Game {
     if (computerMove) {
       this.board.storeMove(computerMove);
       this.changeTurn();
-      this.board.setLegalMovesFor(this.color);
+      this.board.data.setLegalMovesFor(this.color);
     }
   }
 }

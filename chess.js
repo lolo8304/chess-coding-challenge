@@ -1,7 +1,7 @@
 let W = 300;
 let H = 500;
 const PADDING = 5;
-const PADDING_TOP = 60+PADDING;
+const PADDING_TOP = 60 + PADDING;
 const PADDING_BOTTOM = PADDING;
 let CELL_SIZE = 20; //px
 const COL_CELLS = 8; // count
@@ -56,7 +56,9 @@ function resizeIfNeeded() {
   H = windowHeight;
 
   const cellSizeW = Math.floor((W - 2 * PADDING) / COL_CELLS_AND_BOUNDARY);
-  const cellSizeH = Math.floor((H - 2 * PADDING-PADDING_BOTTOM-PADDING_TOP) / ROW_CELLS_AND_BOUNDARY);
+  const cellSizeH = Math.floor(
+    (H - 2 * PADDING - PADDING_BOTTOM - PADDING_TOP) / ROW_CELLS_AND_BOUNDARY
+  );
 
   CELL_SIZE = Math.min(cellSizeH, cellSizeW);
 }
@@ -113,6 +115,7 @@ function setup() {
     Piece.ROOK,
     Piece.PAWN,
   ];
+  boardSetupStatic();
   imgFigures = new Array(12);
   const pixels = 45 * 5;
   for (let y = 0; y < 2; y++) {
