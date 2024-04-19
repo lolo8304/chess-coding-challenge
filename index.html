@@ -32,14 +32,44 @@
         -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
         /* mobile webkit */
       }
+      .full-width-input {
+          width: 100%;         /* Makes the input take up 100% of its parent's width */
+          box-sizing: border-box; /* Includes padding and border in the element's width */
+          font-size: x-large;
+          font-family: 'Arial', sans-serif;
+      }
+      .body {
+        color: white
+      }
+    </style>
+
     </style>
     <script src="p5.min.js"></script>
     <script src="chess.js"></script>
     <script src="game.js"></script>
     <script src="board.js"></script>
+    <script src="computerplayers.js"></script>
+    <script>
+        function handleSubmit(event) {
+            event.preventDefault(); 
+            const fenValue = document.getElementById('fen').value; 
+            if (fenValue) {
+              window.location.hash = fenValue
+              window.location.reload();
+            }
+        }
+    </script>
   </head>
 
-  <body>
+  <body class="body">
     <main></main>
+    <div>
+        <form onsubmit="handleSubmit(event)">
+          <input id="fen" class="full-width-input" value="r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - " id="fen" />
+          <button type="submit">start with FEN</button>
+          <button onclick="window.location.href='/'; return false" type="submit">HOME</button>
+          <a href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
+        </form>
+      </div>
   </body>
 </html>

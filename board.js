@@ -32,7 +32,9 @@ const PieceNames = {
   16: "BLACK",
 };
 
-const FEN_start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const FEN_start = fen_hash
+  ? fen_hash
+  : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 //const FEN_start = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
 const FEN_Pieces = {
   k: Piece.KING, // könig
@@ -181,7 +183,10 @@ class BoardData {
     if (oldLegalMoves.color != color || !newLegalMoves.eq(oldLegalMoves)) {
       this.legalMoves = newLegalMoves;
       this.opponentLegalMoves = this.legalMovesFor(opponentColor);
+      console.log("Moves " + PieceNames[color]);
       console.table(this.legalMoves.moves);
+      console.log("Moves " + PieceNames[opponentColor]);
+      console.table(this.opponentLegalMoves.moves);
     }
     if (this.selectedIndex != NOT_SELECTED) {
       this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
@@ -237,7 +242,7 @@ class BoardData {
   }
 
   debugIndexColorTarget(index) {
-    if (this.enPassantPawns.includes(index)) return "green";
+    //if (this.enPassantPawns.includes(index)) return "green";
     const found = this.debuggingIndexes.find((x) => x.to === index);
     if (!found) return undefined;
     if (found.to === index) return "red";
@@ -272,9 +277,9 @@ class Board {
     }
   }
 
-  getPossibleMoveForTargetIndex(index) {
+  getPossibleMoveForTargetIndex(targetIndex, index) {
     if (this.data.selectedIndex === -1) return undefined;
-    return this.data.legalMovesForSelectedIndex.find((x) => x.to === index);
+    return this.data.legalMovesForSelectedIndex.find((x) => x.to === targetIndex && (!index || x.from === index));
   }
   hasPossibleMoveForIndex(index) {
     if (this.data.selectedIndex != -1) return false;
@@ -489,10 +494,15 @@ class Move {
     this.colorName = PieceNames[board.squares[from] & Piece.COLOR_MASK];
     this.pieceName = PieceNames[board.squares[from] & Piece.PIECES_MASK];
     this.piece = board.squares[from];
+    this.targetPiece = board.squares[to];
     this.board = board;
     this.from = from;
     this.to = to;
-    this.isHit = isHit;
+    this.isHit = isHit ? true : undefined;
+    this.isCheck =
+      isHit && (this.targetPiece & Piece.PIECES_MASK) === Piece.KING
+        ? true
+        : undefined;
     this.enPassant = enPassant; // enPassant
     this.castlingKingTargetIndex = castlingKingTargetIndex; // castling king - king position
     this.castlingRookStartIndex = castlingRookStartIndex; // castling king - rook position start
@@ -830,50 +840,5 @@ class LegalMoves {
         } while (inc === 1 ? n < distanceToTarget : n > distanceToTarget);
       }
     }
-  }
-}
-
-class ComputerPlayer {
-  constructor(boardData, color) {
-    this.boardData = boardData;
-    this.color = color;
-    this._isOn = false;
-    this.runNext = false;
-  }
-
-  isTurn(color) {
-    if (!this._isOn) return false;
-    const turn = this.color === color;
-    this.runNext = turn;
-    return turn;
-  }
-
-  shallRunNext() {
-    return this.runNext;
-  }
-
-  chooseMove() {
-    if (this.boardData.legalMoves.color === this.color) {
-      return this.bestMove(this.boardData.legalMoves);
-    }
-    this.runNext = false;
-    return undefined;
-  }
-
-  bestMove(legalMoves) {
-    const randomMove = Math.floor(random(legalMoves.moves.length));
-    return legalMoves.moves[randomMove];
-  }
-
-  on() {
-    this._isOn = true;
-    return this;
-  }
-  off() {
-    this._isOn = false;
-    return this;
-  }
-  isOn() {
-    return this._isOn;
   }
 }

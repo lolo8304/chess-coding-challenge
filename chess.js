@@ -21,6 +21,8 @@ let isGameFinished = false;
 let imgSprite;
 let imgFigures = [];
 
+const fen_hash = window.location.hash.substring(1);
+
 function createTButton(title, name) {
   const newButton = createButton(title, name);
   newButton.style("display", "none");
@@ -61,6 +63,9 @@ function resizeIfNeeded() {
   );
 
   CELL_SIZE = Math.min(cellSizeH, cellSizeW);
+  W = CELL_SIZE * ROW_CELLS + 2 * PADDING;
+  H = CELL_SIZE * ROW_CELLS + 2 * PADDING + PADDING_BOTTOM + PADDING_TOP;
+  resizeCanvas(W, H);
 }
 
 function resizeFinalize() {
