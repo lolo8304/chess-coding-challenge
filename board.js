@@ -139,6 +139,7 @@ class BoardData {
     this.selectCellIndex(NOT_SELECTED);
     this.legalMoves = new LegalMoves(Piece.WHITE, this, this.history);
     this.opponentLegalMoves = new LegalMoves(Piece.BLACK, this, this.history);
+    this.enPassantPawns = [];
   }
 
   selectCellIndex(index) {
@@ -226,20 +227,25 @@ class BoardData {
 
   debugIndexColorAll(index) {
     const found = this.debuggingIndexes.find(
-      (x) => x.from === index || x.to === index || x?.via === index
+      (x) => x.from === index || x.to === index || x?.enPassant === index
     );
     if (!found) return undefined;
     if (found.from === index) return "blue";
     if (found.to === index) return "cyan";
-    if (found.via === index) return "orange";
+    if (found.enPassant === index) return "orange";
     return "black";
   }
 
   debugIndexColorTarget(index) {
+    if (this.enPassantPawns.includes(index)) return "green";
     const found = this.debuggingIndexes.find((x) => x.to === index);
     if (!found) return undefined;
     if (found.to === index) return "red";
     return "black";
+  }
+
+  isLegalEnPassant(targetEnPassant) {
+    return this.enPassantPawns.includes(targetEnPassant);
   }
 }
 
@@ -343,6 +349,7 @@ class Board {
       if (debugColor === "blue") fill("rgba(0, 0, 153, 0.4)");
       if (debugColor === "cyan") fill("rgba(0, 255, 255, 0.4)");
       if (debugColor === "orange") fill("rgba(255, 153, 51, 0.4)");
+      if (debugColor === "green") fill("rgba(0, 255, 0, 0.8)");
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
 
@@ -439,12 +446,16 @@ class Board {
     return undefined;
   }
 
-  storeMove(move) {
+  makeMove(move) {
+    this.data.enPassantPawns = [];
+    if (move.isEnPassantAttackable()) {
+      this.data.enPassantPawns.push(move.to);
+    }
     this.history.storeMove(move);
     this.data.squares[move.to] = this.data.squares[move.from];
     this.data.squares[move.from] = Piece.None;
-    if (move.via) {
-      this.data.squares[move.via] = Piece.None;
+    if (move.enPassant) {
+      this.data.squares[move.enPassant] = Piece.None;
     }
     if (move.castlingKingTargetIndex) {
       this.data.squares[move.castlingRookTargetIndex] =
@@ -452,6 +463,11 @@ class Board {
       this.data.squares[move.castlingRookStartIndex] = Piece.None;
     }
     this.selectCellIndex(NOT_SELECTED);
+    if (move.enPassant) {
+      this.data.enPassantPawns = this.data.enPassantPawns.filter(
+        (x) => x != move.enPassant
+      );
+    }
   }
 
   selectCellIndex(index) {
@@ -465,7 +481,7 @@ class Move {
     from,
     to,
     isHit = false,
-    via = undefined,
+    enPassant = undefined,
     castlingKingTargetIndex = undefined,
     castlingRookStartIndex = undefined,
     castlingRookTargetIndex = undefined
@@ -477,7 +493,7 @@ class Move {
     this.from = from;
     this.to = to;
     this.isHit = isHit;
-    this.via = via; // enPassang
+    this.enPassant = enPassant; // enPassant
     this.castlingKingTargetIndex = castlingKingTargetIndex; // castling king - king position
     this.castlingRookStartIndex = castlingRookStartIndex; // castling king - rook position start
     this.castlingRookTargetIndex = castlingRookTargetIndex; // castling king - rook position target
@@ -488,6 +504,12 @@ class Move {
       other?.from === this.from &&
       other?.to === this.to &&
       other?.isHit === this.isHit
+    );
+  }
+  isEnPassantAttackable() {
+    return (
+      (this.piece & Piece.PIECES_MASK) === Piece.PAWN &&
+      Math.abs(this.from - this.to) === 16 // 2 move
     );
   }
 }
@@ -731,7 +753,6 @@ class LegalMoves {
         const pieceOnTargetIndex = this.boardData.squares[targetIndex];
         const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
         if (pieceOnTargetIndexColor === oppositeColor) {
-          this.addMove(new Move(this.boardData, startIndex, targetIndex, true));
           const newMove = new Move(
             this.boardData,
             startIndex,
@@ -750,14 +771,16 @@ class LegalMoves {
             const pieceEnPOnTargetIndexColor =
               pieceEnPOnTargetIndex & Piece.COLOR_MASK;
             if (pieceEnPOnTargetIndexColor === oppositeColor) {
-              const newMove = new Move(
-                this.boardData,
-                startIndex,
-                targetIndex,
-                true,
-                targetEnPIndex
-              );
-              this.addMove(newMove);
+              if (this.boardData.isLegalEnPassant(targetEnPIndex)) {
+                const newMove = new Move(
+                  this.boardData,
+                  startIndex,
+                  targetIndex,
+                  true,
+                  targetEnPIndex
+                );
+                this.addMove(newMove);
+              }
             }
           }
         }

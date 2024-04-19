@@ -12,7 +12,7 @@ class Game {
     this.color = Piece.WHITE;
     this.board.data.setLegalMovesFor(this.color);
 
-    this.computerBlack = new ComputerPlayer(this.board.data, Piece.BLACK).on();
+    this.computerBlack = new ComputerPlayer(this.board.data, Piece.BLACK).off();
     this.computerWhite = new ComputerPlayer(this.board.data, Piece.WHITE).off();
   }
 
@@ -38,7 +38,6 @@ class Game {
     this.board.draw();
   }
 
-
   clicked(clientY, clientX) {
     const selectedIndex = this.board.data.selectedIndex;
     if (selectedIndex >= 0) {
@@ -47,7 +46,7 @@ class Game {
         clickedCell.index
       );
       if (clickedCell && clickedCell.index != selectedIndex && validMove) {
-        this.board.storeMove(validMove);
+        this.board.makeMove(validMove);
         this.changeTurn();
         this.board.data.setLegalMovesFor(this.color);
         this.computerMoveBlack();
@@ -92,7 +91,7 @@ class Game {
   computerMove(computer) {
     const computerMove = computer.chooseMove();
     if (computerMove) {
-      this.board.storeMove(computerMove);
+      this.board.makeMove(computerMove);
       this.changeTurn();
       this.board.data.setLegalMovesFor(this.color);
     }
