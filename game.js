@@ -12,30 +12,48 @@ class Game {
     this.color = Piece.WHITE;
     this.board.data.setLegalMovesFor(this.color);
 
-    this.computerBlack = new ComputerPlayerRandomHitFirst(this.board.data, Piece.BLACK).on();
-    this.computerWhite = new ComputerPlayerRandomHitFirst(this.board.data, Piece.WHITE).off();
+    this.computerBlack = new ComputerPlayerRandomHitFirst(
+      this.board.data,
+      Piece.BLACK
+    ).on();
+    this.computerWhite = new ComputerPlayerRandomHitFirst(
+      this.board.data,
+      Piece.WHITE
+    ).off();
+    this.velocity = 0.1;
+    this.time = 0.0;
   }
-  
+
   draw() {
     this.board.draw();
     textSize(40);
     fill("white");
     textAlign(CENTER);
-    let turnText = this.color === Piece.WHITE ? "WHITE's turn" : "BLACK's turn";
+    let turnText = this.color === Piece.WHITE ? "WHITE's turn"+(this.computerWhite.isOn() ? " (Computer)" : "") : "BLACK's turn"+(this.computerBlack.isOn() ? " (Computer)" : "");
     if (this.board.check) {
       turnText += " CHECK";
     }
     text(turnText, this.x + this.w / 2, this.y - this.paddingTop + 50);
-    if (this.computerBlack.shallRunNext()) {
-      this.computerMove(this.computerBlack);
+    if (this.time > 1.0) {
+      const movedBlack = this.computerMoveNow(this.computerBlack, 0);
+      const movedWhite = this.computerMoveNow(this.computerWhite, 0);
+      if (!movedWhite && !movedBlack && this.computerBlack.isOn() && this.computerWhite.isOn()) {
+        this.computerWhite.isTurn(this.color);
+      }
+      this.time = 0;
     }
-    if (this.computerWhite.shallRunNext()) {
-      this.computerMove(this.computerWhite);
-    }
+    this.time += this.velocity;
   }
 
   drawBoad() {
     this.board.draw();
+  }
+
+  makeMove(move, depth) {
+    this.board.makeMove(move);
+    this.changeTurn();
+    this.board.data.setLegalMovesFor(this.color);
+    this.computerMove(undefined, depth + 1);
   }
 
   clicked(clientY, clientX) {
@@ -47,10 +65,7 @@ class Game {
         selectedIndex
       );
       if (clickedCell && clickedCell.index != selectedIndex && validMove) {
-        this.board.makeMove(validMove);
-        this.changeTurn();
-        this.board.data.setLegalMovesFor(this.color);
-        this.computerMoveBlack();
+        this.makeMove(validMove, 0);
       } else {
         this.board.selectCellIndex(NOT_SELECTED);
         this.board.data.setLegalMovesFor(this.color);
@@ -86,15 +101,29 @@ class Game {
   }
   computerMoveWhite() {
     if (this.computerWhite.isOn() && this.computerWhite.isTurn(this.color)) {
-      //this.computerMove(this.computerWhite);
+      //skip
     }
   }
-  computerMove(computer) {
-    const computerMove = computer.chooseMove();
-    if (computerMove) {
-      this.board.makeMove(computerMove);
-      this.changeTurn();
-      this.board.data.setLegalMovesFor(this.color);
+
+  computerMoveNow(computer, depth) {
+    if (computer.isOn() && computer.shallRunNext()) {
+      const computerMove = computer.chooseMove();
+      if (computerMove) {
+        this.makeMove(computerMove, depth);
+        return true;
+      }
     }
+    return false;
+  }
+
+  computerMove(computer, depth) {
+    if (!computer) {
+      // must call isTurn - to calculate next run in draw
+      const isWhiteTurn = this.computerWhite.isTurn(this.color);
+      this.computerBlack.isTurn(this.color);
+      computer = isWhiteTurn ? this.computerWhite : this.computerBlack;
+    }
+    if (depth > 1) return false;
+    return this.computerMoveNow(computer, depth);
   }
 }

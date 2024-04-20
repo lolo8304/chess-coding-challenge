@@ -37,9 +37,13 @@
           box-sizing: border-box; /* Includes padding and border in the element's width */
           font-size: large;
           font-family: 'Arial', sans-serif;
+          margin-bottom: 10px;
       }
       .body {
         color: white
+      }
+      .computer-switcher {
+        width: 50%;
       }
     </style>
 
@@ -58,6 +62,15 @@
               window.location.reload();
             }
         }
+
+        function updateStatus(computer, status) {
+          const resultElement = document.getElementById('result');
+          if (computer === 'white') {
+              status === "ON" ? game.computerWhite.on() :  game.computerWhite.off()
+          } else if (computer === 'black') {
+              status === "ON" ? game.computerBlack.on() :  game.computerBlack.off()
+          }
+        }
     </script>
   </head>
 
@@ -70,6 +83,32 @@
           <button onclick="window.location.href='/'; return false" type="submit">HOME</button>
           <a href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
         </form>
+
+        <form id="computerForm" style="display: flex;padding:10px;">
+          <fieldset class="computer-switcher">
+              <legend>WHITE computer</legend>
+              <label>
+                  <input type="radio" name="whitePower" value="ON" onchange="updateStatus('white', 'ON')">
+                  ON
+              </label>
+              <label>
+                  <input type="radio" name="whitePower" value="OFF" onchange="updateStatus('white', 'OFF')" checked>
+                  OFF
+              </label>
+          </fieldset>
+  
+          <fieldset class="computer-switcher">
+              <legend>BLACK computer</legend>
+              <label>
+                  <input type="radio" name="blackPower" value="ON" onchange="updateStatus('black', 'ON')" checked>
+                  ON
+              </label>
+              <label>
+                  <input type="radio" name="blackPower" value="OFF" onchange="updateStatus('black', 'OFF')">
+                  OFF
+              </label>
+          </fieldset>
+      </form>
       </div>
   </body>
 </html>

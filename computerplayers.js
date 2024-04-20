@@ -31,6 +31,9 @@ class ComputerPlayer {
     if (!this._isOn) return false;
     const turn = this.color === color;
     this.runNext = turn;
+    if (this.runNext) {
+      console.log("Computer run Next "+PieceNames[this.color])
+    }
     return turn;
   }
 
