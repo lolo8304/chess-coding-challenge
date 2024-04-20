@@ -12,15 +12,18 @@ class Game {
     this.color = Piece.WHITE;
     this.board.data.setLegalMovesFor(this.color);
 
-    this.computerBlack = new ComputerPlayerRandomHitFirst(
+    this.computerBlack = evaluators.newPlayerOn(
+      "hit-random",
       this.board.data,
       Piece.BLACK
-    ).on();
-    this.computerWhite = new ComputerPlayerRandomHitFirst(
+    );
+    this.computerWhite = evaluators.newPlayerOff(
+      "hit-random",
       this.board.data,
       Piece.WHITE
-    ).off();
-    this.velocity = 0.1;
+    );
+
+    this.velocity = 0.02;
     this.time = 0.0;
   }
 
@@ -29,7 +32,16 @@ class Game {
     textSize(40);
     fill("white");
     textAlign(CENTER);
-    let turnText = this.color === Piece.WHITE ? "WHITE's turn"+(this.computerWhite.isOn() ? " (Computer)" : "") : "BLACK's turn"+(this.computerBlack.isOn() ? " (Computer)" : "");
+    let turnText =
+      this.color === Piece.WHITE
+        ? "WHITE's turn" +
+          (this.computerWhite.isOn()
+            ? " (" + this.computerWhite.name + ")"
+            : "")
+        : "BLACK's turn" +
+          (this.computerBlack.isOn()
+            ? " (" + this.computerBlack.name + ")"
+            : "");
     if (this.board.check) {
       turnText += " CHECK";
     }
@@ -37,7 +49,12 @@ class Game {
     if (this.time > 1.0) {
       const movedBlack = this.computerMoveNow(this.computerBlack, 0);
       const movedWhite = this.computerMoveNow(this.computerWhite, 0);
-      if (!movedWhite && !movedBlack && this.computerBlack.isOn() && this.computerWhite.isOn()) {
+      if (
+        !movedWhite &&
+        !movedBlack &&
+        this.computerBlack.isOn() &&
+        this.computerWhite.isOn()
+      ) {
         this.computerWhite.isTurn(this.color);
       }
       this.time = 0;

@@ -7,20 +7,21 @@ class ComputerPlayerFactory {
     this.factory[shortName] = className;
   }
 
-  newPlayerOn(named, ...args) {
-    return this.newPlayerOff(named, args).on()
+  newPlayerOn(named, boardData, color) {
+    return this.newPlayerOff(named, boardData, color).on();
   }
-  newPlayerOff(named, ...args) {
+  newPlayerOff(named, boardData, color) {
     const className = this.factory[named];
-    if (className && window[className]) {
-      return new window[className](...args).off();
+    if (className) {
+      return new className(named, boardData, color).off();
     }
     throw new Error(`Class ${className} named '${named}' not found`);
   }
 }
 
 class ComputerPlayer {
-  constructor(boardData, color) {
+  constructor(name, boardData, color) {
+    this.name = name;
     this.boardData = boardData;
     this.color = color;
     this._isOn = false;
@@ -32,7 +33,7 @@ class ComputerPlayer {
     const turn = this.color === color;
     this.runNext = turn;
     if (this.runNext) {
-      console.log("Computer run Next "+PieceNames[this.color])
+      console.log("Computer run Next " + PieceNames[this.color]);
     }
     return turn;
   }
@@ -67,8 +68,8 @@ class ComputerPlayer {
 }
 
 class ComputerPlayerRandom extends ComputerPlayer {
-  constructor(boardData, color) {
-    super(boardData, color);
+  constructor(name, boardData, color) {
+    super(name, boardData, color);
   }
   bestMove(legalMoves) {
     const randomMove = Math.floor(random(legalMoves.moves.length));
@@ -77,8 +78,8 @@ class ComputerPlayerRandom extends ComputerPlayer {
 }
 
 class ComputerPlayerRandomHitFirst extends ComputerPlayer {
-  constructor(boardData, color) {
-    super(boardData, color);
+  constructor(name, boardData, color) {
+    super(name, boardData, color);
   }
   bestMove(legalMoves) {
     const hits = legalMoves.moves.filter((x) => x.isHit);
@@ -93,5 +94,5 @@ class ComputerPlayerRandomHitFirst extends ComputerPlayer {
 }
 
 const evaluators = new ComputerPlayerFactory();
-evaluators.addEvaluator("random", "ComputerPlayerRandom");
-evaluators.addEvaluator("hit-random", "ComputerPlayerRandomHitFirst");
+evaluators.addEvaluator("random", ComputerPlayerRandom);
+evaluators.addEvaluator("hit-random", ComputerPlayerRandomHitFirst);
