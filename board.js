@@ -279,7 +279,9 @@ class Board {
 
   getPossibleMoveForTargetIndex(targetIndex, index) {
     if (this.data.selectedIndex === -1) return undefined;
-    return this.data.legalMovesForSelectedIndex.find((x) => x.to === targetIndex && (!index || x.from === index));
+    return this.data.legalMovesForSelectedIndex.find(
+      (x) => x.to === targetIndex && (!index || x.from === index)
+    );
   }
   hasPossibleMoveForIndex(index) {
     if (this.data.selectedIndex != -1) return false;
@@ -601,6 +603,7 @@ class LegalMoves {
       rookPositions[0]
     );
     if (!rookLongMoved) {
+      const targetIndex = rookPositions[0] + 2;
       let isEmpty = true;
       for (let index = rookPositions[0] + 1; index < startIndex; index++) {
         const shouldBeEmptyPiece = this.boardData.squares[index];
@@ -608,9 +611,24 @@ class LegalMoves {
           isEmpty = false;
           break;
         }
+        // is empty - check now if attack opponent attacks this index - only for index where king is moving
+        if (targetIndex <= index && index < startIndex) {
+          if (this.boardData.opponentLegalMoves.hasAnyMoveToIndex(index)) {
+            console.log("Castling not allowed due to attack on " + index);
+            isEmpty = false;
+            break;
+          }
+        }
       }
-      if (isEmpty) {
-        const targetIndex = rookPositions[0] + 2;
+      if (isEmpty && this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)) {
+        isEmpty = false;
+        console.log(
+          "Castling not allowed due because King " +
+            startIndex +
+            " is in check"
+        );
+      }
+    if (isEmpty) {
         const newMove = new Move(
           this.boardData,
           startIndex,
@@ -631,15 +649,31 @@ class LegalMoves {
     );
     if (!rookShortMoved) {
       let isEmpty = true;
+      const targetIndex = startIndex + 2;
       for (let index = startIndex + 1; index < rookPositions[1]; index++) {
         const shouldBeEmptyPiece = this.boardData.squares[index];
         if (shouldBeEmptyPiece != 0) {
           isEmpty = false;
           break;
         }
+        // is empty - check now if attack opponent attacks this index - only for index where king is moving
+        if (startIndex < index && index <= targetIndex) {
+          if (this.boardData.opponentLegalMoves.hasAnyMoveToIndex(index)) {
+            console.log("Castling not allowed due to attack on " + index);
+            isEmpty = false;
+            break;
+          }
+        }
+      }
+      if (isEmpty && this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)) {
+        isEmpty = false;
+        console.log(
+          "Castling not allowed due because King " +
+            startIndex +
+            " is in check"
+        );
       }
       if (isEmpty) {
-        const targetIndex = startIndex + 2;
         const newMove = new Move(
           this.boardData,
           startIndex,
