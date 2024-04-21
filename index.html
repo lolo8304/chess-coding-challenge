@@ -66,9 +66,9 @@
         function updateStatus(computer, status) {
           const resultElement = document.getElementById('result');
           if (computer === 'white') {
-              status === "ON" ? game.computerWhite.on() :  game.computerWhite.off()
+              status === "ON" ? game.computerWhite.on().checkForAutoTurn() :  game.computerWhite.off()
           } else if (computer === 'black') {
-              status === "ON" ? game.computerBlack.on() :  game.computerBlack.off()
+              status === "ON" ? game.computerBlack.on().checkForAutoTurn() :  game.computerBlack.off()
           }
         }
         document.addEventListener('DOMContentLoaded', function() {
@@ -115,11 +115,11 @@
           <fieldset class="computer-switcher">
               <legend>BLACK computer</legend>
               <label>
-                  <input type="radio" name="blackPower" value="ON" onchange="updateStatus('black', 'ON')" checked>
+                  <input type="radio" name="blackPower" value="ON" onchange="updateStatus('black', 'ON')" >
                   ON
               </label>
               <label>
-                  <input type="radio" name="blackPower" value="OFF" onchange="updateStatus('black', 'OFF')">
+                  <input type="radio" name="blackPower" value="OFF" onchange="updateStatus('black', 'OFF')" checked>
                   OFF
               </label>
           </fieldset>

@@ -37,6 +37,10 @@ class ComputerPlayer {
     }
     return turn;
   }
+  checkForAutoTurn() {
+    this.isTurn(this.boardData.legalMoves.color)
+    return this
+  }
 
   shallRunNext() {
     return this.runNext;

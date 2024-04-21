@@ -12,7 +12,7 @@ class Game {
     this.color = this.board.data.legalMoves.color;
     this.board.data.setLegalMovesFor(this.color);
 
-    this.computerBlack = evaluators.newPlayerOn(
+    this.computerBlack = evaluators.newPlayerOff(
       "hit-random",
       this.board.data,
       Piece.BLACK
