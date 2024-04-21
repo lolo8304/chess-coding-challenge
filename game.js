@@ -33,11 +33,11 @@ class Game {
       this.color === Piece.WHITE
         ? "WHITE's turn" +
           (this.computerWhite.isOn()
-            ? " (" + this.computerWhite.name + ")"
+            ? "(AI)"// (" + this.computerWhite.name + ")"
             : "")
         : "BLACK's turn" +
           (this.computerBlack.isOn()
-            ? " (" + this.computerBlack.name + ")"
+            ? " (AI)"// (" + this.computerBlack.name + ")"
             : "");
     if (this.board.check) {
       turnText += " CHECK";
