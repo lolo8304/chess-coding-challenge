@@ -21,7 +21,7 @@ let isGameFinished = false;
 let imgSprite;
 let imgFigures = [];
 
-const fen_hash = window.location.hash.substring(1);
+let fen_hash = window.location.hash.substring(1).replace(/%20/g, " ");
 
 function createTButton(title, name) {
   const newButton = createButton(title, name);
@@ -57,10 +57,18 @@ function resizeIfNeeded() {
   W = windowWidth;
   H = windowHeight;
 
-  const cellSizeW = Math.floor((W - 2 * PADDING) / COL_CELLS_AND_BOUNDARY);
-  const cellSizeH = Math.floor(
+  let cellSizeW = Math.floor((W - 2 * PADDING) / COL_CELLS_AND_BOUNDARY);
+  let cellSizeH = Math.floor(
     (H - 2 * PADDING - PADDING_BOTTOM - PADDING_TOP) / ROW_CELLS_AND_BOUNDARY
   );
+  if (cellSizeW > cellSizeH) {
+    W = windowWidth;
+    H = windowHeight - 150;
+    cellSizeW = Math.floor((W - 2 * PADDING) / COL_CELLS_AND_BOUNDARY);
+    cellSizeH = Math.floor(
+      (H - 2 * PADDING - PADDING_BOTTOM - PADDING_TOP) / ROW_CELLS_AND_BOUNDARY
+    );
+  }
 
   CELL_SIZE = Math.min(cellSizeH, cellSizeW);
   W = CELL_SIZE * ROW_CELLS + 2 * PADDING;
@@ -74,7 +82,8 @@ function resizeFinalize() {
     CELL_SIZE * ROW_CELLS_AND_BOUNDARY,
     PADDING,
     PADDING_TOP,
-    PADDING_BOTTOM
+    PADDING_BOTTOM,
+    fen_hash
   );
 }
 
@@ -98,6 +107,7 @@ function getElementByValue(tag, value) {
 }
 
 function windowResized() {
+  fen_hash = window.location.hash.substring(1).replace(/%20/g, " ");
   resizeCanvas(windowWidth, windowHeight);
   resizeIfNeeded();
   resizeFinalize();

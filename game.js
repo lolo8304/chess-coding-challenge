@@ -1,5 +1,5 @@
 class Game {
-  constructor(w, h, padding, paddingTop, paddingBottom) {
+  constructor(w, h, padding, paddingTop, paddingBottom, fen) {
     this.h = h;
     this.w = w;
     this.x = padding;
@@ -7,9 +7,9 @@ class Game {
     this.padding = padding;
     this.paddingTop = paddingTop;
     this.paddingBottom = paddingBottom;
-    this.board = new Board(this.x, this.y, this.w, this.h);
+    this.board = new Board(this.x, this.y, this.w, this.h, fen);
 
-    this.color = Piece.WHITE;
+    this.color = this.board.data.legalMoves.color;
     this.board.data.setLegalMovesFor(this.color);
 
     this.computerBlack = evaluators.newPlayerOn(
@@ -29,9 +29,6 @@ class Game {
 
   draw() {
     this.board.draw();
-    textSize(40);
-    fill("white");
-    textAlign(CENTER);
     let turnText =
       this.color === Piece.WHITE
         ? "WHITE's turn" +
@@ -45,6 +42,14 @@ class Game {
     if (this.board.check) {
       turnText += " CHECK";
     }
+    if (this.board.data.isFinished()) {
+      turnText = this.board.data.result;
+      fill("red");
+      rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
+    }
+    textSize(40);
+    fill("white");
+    textAlign(CENTER);
     text(turnText, this.x + this.w / 2, this.y - this.paddingTop + 50);
     if (this.time > 1.0) {
       const movedBlack = this.computerMoveNow(this.computerBlack, 0);
@@ -70,6 +75,12 @@ class Game {
     this.board.makeMove(move);
     this.changeTurn();
     this.board.data.setLegalMovesFor(this.color);
+    const fen = this.board.data.calculatedFen();
+    const fenHTML = window.document.getElementById("fen");
+    if (fenHTML) {
+      fenHTML.value = fen;
+      window.location.hash = fen;
+    }
     this.computerMove(undefined, depth + 1);
   }
 

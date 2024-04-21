@@ -32,6 +32,19 @@ const PieceNames = {
   16: "BLACK",
 };
 
+const PieceShortNamesLower = {
+  0: "", // No piece
+  1: "k", // King
+  2: "p", // Pawn
+  3: "n", // Knight
+  4: "b", // Bishop
+  5: "r", // Rook
+  6: "q", // Queen
+};
+
+const CastlingPositionsWhite = [56, 63];
+const CastlingPositionsBlack = [0, 7];
+
 const FEN_start = fen_hash
   ? fen_hash
   : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -108,6 +121,20 @@ function isKnight(piece) {
   return (piece & Piece.PIECES_MASK) === Piece.KNIGHT;
 }
 
+function toPieceNotation(piece) {
+  const pieceOnly = piece & Piece.PIECES_MASK;
+  const color = piece & Piece.COLOR_MASK;
+
+  let notation = PieceShortNamesLower[pieceOnly];
+  if (notation === "p") {
+    notation = "";
+  }
+  if (color === Piece.WHITE) {
+    notation = notation.toUpperCase();
+  }
+  return notation || "";
+}
+
 class History {
   constructor(historyInit) {
     this.movesHistory = historyInit || [];
@@ -136,24 +163,83 @@ class BoardData {
     this.debuggingIndexes = [];
     this.history = history;
     this.squares = new Array(64).fill(0);
-    this.resetSquares(fen);
     this.selectedIndex = NOT_SELECTED;
     this.selectCellIndex(NOT_SELECTED);
-    this.legalMoves = new LegalMoves(Piece.WHITE, this, this.history);
-    this.opponentLegalMoves = new LegalMoves(Piece.BLACK, this, this.history);
-    this.enPassantPawns = [];
+    this.enPassantMove = [];
+    this.halfMoveCounter = 0;
+    this.nextFullMoveCounter = 1;
+    this.resetHalfMoveCounter();
+    this.resetSquares(fen);
+    this.result = undefined;
   }
 
   selectCellIndex(index) {
     this.selectedIndex = index;
   }
 
-  // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+  // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e6 0 1
   resetSquares(fen) {
     if (!fen) {
       fen = FEN_start;
     }
-    const fenboard = fen.split(" ")[0];
+    const fenParts = fen.split(" ");
+    const fenboard = fenParts[0];
+    const startColor = fenParts[1] === "w" ? Piece.WHITE : Piece.BLACK;
+    const castlingOptionsString = fenParts[2] === "-" ? "" : fenParts[2];
+    //const enPassantTarget = fenParts[3]  //TODO: not implemented yet
+    this.halfMoveCounter = +fenParts[4];
+    this.nextFullMoveCounter = +fenParts[5];
+    const castlingOptions = {
+      w: {
+        long: castlingOptionsString.includes("Q"),
+        short: castlingOptionsString.includes("K"),
+      },
+      b: {
+        long: castlingOptionsString.includes("q"),
+        short: castlingOptionsString.includes("k"),
+      },
+    };
+    if (!castlingOptions["w"].long) {
+      this.history.push(
+        new Move(
+          this,
+          CastlingPositionsWhite[0],
+          CastlingPositionsWhite[0],
+          false
+        )
+      );
+    }
+    if (!castlingOptions["w"].short) {
+      this.history.push(
+        new Move(
+          this,
+          CastlingPositionsWhite[1],
+          CastlingPositionsWhite[1],
+          false
+        )
+      );
+    }
+    if (!castlingOptions["b"].long) {
+      this.history.push(
+        new Move(
+          this,
+          CastlingPositionsBlack[0],
+          CastlingPositionsBlack[0],
+          false
+        )
+      );
+    }
+    if (!castlingOptions["b"].short) {
+      this.history.push(
+        new Move(
+          this,
+          CastlingPositionsBlack[1],
+          CastlingPositionsBlack[1],
+          false
+        )
+      );
+    }
+
     let yIndex = 0;
     let xIndex = 0;
     for (let i = 0; i < fenboard.length; i++) {
@@ -172,6 +258,87 @@ class BoardData {
         xIndex++;
       }
     }
+    this.legalMoves = new LegalMoves(startColor, this, this.history);
+    this.opponentLegalMoves = new LegalMoves(
+      startColor ^ Piece.COLOR_MASK,
+      this,
+      this.history
+    );
+  }
+
+  calculatedFen() {
+    let fen = "";
+    let emptyCount = 0;
+
+    for (let i = 0; i < 64; i++) {
+      const piece = this.squares[i];
+      const pieceOnly = piece & Piece.PIECES_MASK;
+      const color = piece & Piece.COLOR_MASK;
+
+      if (pieceOnly === 0) {
+        emptyCount++;
+      } else {
+        if (emptyCount > 0) {
+          fen += emptyCount;
+          emptyCount = 0;
+        }
+        let fenChar = PieceShortNamesLower[pieceOnly];
+        if (color === 8) {
+          fenChar = fenChar.toUpperCase();
+        }
+        fen += fenChar;
+      }
+
+      if ((i + 1) % 8 === 0) {
+        if (emptyCount > 0) {
+          fen += emptyCount;
+          emptyCount = 0;
+        }
+        if (i !== 63) {
+          fen += "/";
+        }
+      }
+    }
+
+    const turn = this.legalMoves.color === 8 ? "w" : "b";
+    const oppositeTurn = this.legalMoves.color === 8 ? "b" : "w";
+    const castlingOptions = {};
+    castlingOptions[turn] = this.legalMoves.getCastlingOptions(
+      this.getKingPosition(this.legalMoves.color),
+      this.legalMoves.color
+    );
+    castlingOptions[oppositeTurn] = this.opponentLegalMoves.getCastlingOptions(
+      this.getKingPosition(this.opponentLegalMoves.color),
+      this.opponentLegalMoves.color
+    );
+
+    let castlingString =
+      (castlingOptions["w"].short ? "K" : "") +
+      (castlingOptions["w"].long ? "Q" : "") +
+      (castlingOptions["b"].short ? "k" : "") +
+      (castlingOptions["b"].long ? "q" : "");
+    if (castlingString === "") {
+      castlingString = "-";
+    }
+
+    let enPassantString = this.enPassantMove
+      ? this.indexToAlgebraic(this.enPassantMove.enPassantTarget)
+      : "-";
+
+    // Example: , no en passant, and default half/full move counters.
+    const finalFenString =
+      fen +
+      " " +
+      turn +
+      " " +
+      castlingString +
+      " " +
+      enPassantString +
+      " " +
+      this.halfMoveCounter +
+      " " +
+      this.nextFullMoveCounter;
+    return finalFenString;
   }
 
   setLegalMovesFor(color) {
@@ -196,8 +363,10 @@ class BoardData {
     //for (const move of this.opponentLegalMoves.moves) {
     //  this.debuggingIndexes.push(move);
     //}
-    if (this.amIunderCheck()) {
+    const movesToCheck = this.getMovesAsIamUnderCheck();
+    if (movesToCheck.length > 0) {
       this.check = true;
+      this.legalMoves.removePseudoIllegalMoves(movesToCheck);
     }
   }
 
@@ -211,8 +380,15 @@ class BoardData {
       gridX: index % ROW_CELLS,
     };
   }
-  amIunderCheck() {
-    return this.opponentLegalMoves.hasMoveForMyKing();
+  indexToAlgebraic(index) {
+    const grid = this.indexToGrid(index);
+    const file = "abcdefgh"[grid.gridX];
+    const rank = 1 + Math.floor(7 - grid.gridY);
+    return `${file}${rank}`;
+  }
+
+  getMovesAsIamUnderCheck() {
+    return this.opponentLegalMoves.getMovesToMyKing();
   }
   indexesOfPiece(piece) {
     const pieceOnly = piece & Piece.PIECES_MASK;
@@ -242,7 +418,7 @@ class BoardData {
   }
 
   debugIndexColorTarget(index) {
-    //if (this.enPassantPawns.includes(index)) return "green";
+    //if (this.enPassantMove.includes(index)) return "green";
     const found = this.debuggingIndexes.find((x) => x.to === index);
     if (!found) return undefined;
     if (found.to === index) return "red";
@@ -250,18 +426,38 @@ class BoardData {
   }
 
   isLegalEnPassant(targetEnPassant) {
-    return this.enPassantPawns.includes(targetEnPassant);
+    return this.enPassantMove && this.enPassantMove.to === targetEnPassant;
+  }
+
+  getKingPosition(color) {
+    return this.anyOfPiece(Piece.KING | color);
+  }
+
+  resetHalfMoveCounter() {
+    this.halfMoveCounter = 0;
+    this.nextFullMoveCounter = Math.floor(this.halfMoveCounter / 2) + 1;
+  }
+
+  incHalfMoveCounter() {
+    this.halfMoveCounter++;
+    this.nextFullMoveCounter = Math.floor(this.halfMoveCounter / 2) + 1;
+  }
+  isFinished() {
+    return this.result != undefined;
+  }
+  isNotFinished() {
+    return this.result === undefined;
   }
 }
 
 class Board {
-  constructor(x, y, w, h) {
+  constructor(x, y, w, h, fen) {
     this.h = h;
     this.w = w;
     this.x = x;
     this.y = y;
     this.history = new History();
-    this.data = new BoardData(this.history);
+    this.data = new BoardData(this.history, fen);
     this.check = false;
   }
 
@@ -285,7 +481,7 @@ class Board {
   }
   hasPossibleMoveForIndex(index) {
     if (this.data.selectedIndex != -1) return false;
-    return this.data.legalMoves.hasAnyMoveForIndex(index);
+    return this.data.legalMoves.hasAnyMoveFromIndex(index);
   }
 
   toPos(gridY, gridX) {
@@ -350,7 +546,9 @@ class Board {
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
 
-    const debugColor = this.data.debugIndexColor(index);
+    const debugColor = this.data.isFinished()
+      ? undefined
+      : this.data.debugIndexColor(index);
     if (debugColor) {
       if (debugColor === "red") fill("rgba(255, 0, 0, 0.4)");
       if (debugColor === "blue") fill("rgba(0, 0, 153, 0.4)");
@@ -360,20 +558,57 @@ class Board {
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
 
-    const pieceIndex =
-      (isWhite ? 0 : 1) * Piece.COUNT + (piece & Piece.PIECES_MASK) - 1;
-    if (piece > 0) {
-      image(imgFigures[pieceIndex], pos.x, pos.y, CELL_SIZE, CELL_SIZE);
+    const checkMoves = this.data.opponentLegalMoves.getCheckMovesTo(index);
+    const isInCheckAttack =
+      this.data.legalMoves.checkAttackIndexes.includes(index);
+    if (
+      (this.data.isNotFinished() && checkMoves.length > 0) ||
+      isInCheckAttack
+    ) {
+      fill("rgba(255, 255, 0, 0.4)");
+      rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
+
     const size = Math.floor(CELL_SIZE / 4);
     textSize(size);
     fill("red");
     const hasPossibleMove = this.hasPossibleMoveForIndex(index);
-    if (!hasPossibleMove) {
+
+    if (this.data.isFinished() || !hasPossibleMove) {
       fill("rgba(255, 255, 255, 0.4)");
     }
-    textAlign(LEFT);
-    text("" + index, pos.x + PADDING, pos.y + size + PADDING);
+    textAlign(RIGHT);
+    text("" + index, pos.x + CELL_SIZE - PADDING, pos.y + size);
+
+    if (gridX === 0) {
+      const rank = 1 + (7 - gridY);
+      textAlign(LEFT);
+      fill("black");
+      text("" + rank, pos.x + PADDING, pos.y + size);
+    }
+    const diff = Math.floor(CELL_SIZE * 0.9);
+    if (gridY === 7) {
+      const file = "abcdefgh"[gridX];
+      textAlign(RIGHT);
+      fill("black");
+      text(
+        "" + file,
+        pos.x + CELL_SIZE - PADDING,
+        pos.y + CELL_SIZE - 2 * PADDING
+      );
+    }
+
+    const pieceIndex =
+      (isWhite ? 0 : 1) * Piece.COUNT + (piece & Piece.PIECES_MASK) - 1;
+    if (piece > 0) {
+      image(
+        imgFigures[pieceIndex],
+        pos.x + diff,
+        pos.y + diff,
+        CELL_SIZE - 2 * diff,
+        CELL_SIZE - 2 * diff
+      );
+    }
   }
 
   isNumber(str) {
@@ -454,9 +689,9 @@ class Board {
   }
 
   makeMove(move) {
-    this.data.enPassantPawns = [];
+    this.data.enPassantMove = undefined;
     if (move.isEnPassantAttackable()) {
-      this.data.enPassantPawns.push(move.to);
+      this.data.enPassantMove = move;
     }
     this.history.storeMove(move);
     this.data.squares[move.to] = this.data.squares[move.from];
@@ -471,9 +706,21 @@ class Board {
     }
     this.selectCellIndex(NOT_SELECTED);
     if (move.enPassant) {
-      this.data.enPassantPawns = this.data.enPassantPawns.filter(
-        (x) => x != move.enPassant
-      );
+      this.data.enPassantMove = undefined;
+    }
+    if (move.pieceOnly === Piece.PAWN || move.isHit) {
+      this.data.resetHalfMoveCounter();
+    } else {
+      this.data.incHalfMoveCounter();
+    }
+    if (this.data.halfMoveCounter === 100) {
+      const confirmed = window.confirm("50 move rule - confirm to offer DRAW?");
+      if (confirmed) {
+        this.data.result = "DRAW - agreed by 50-move rule ";
+      }
+    }
+    if (this.data.halfMoveCounter === 150) {
+      this.data.result = "DRAW - forced by 75-move rule";
     }
   }
 
@@ -489,26 +736,32 @@ class Move {
     to,
     isHit = false,
     enPassant = undefined,
+    enPassantTarget = undefined,
     castlingKingTargetIndex = undefined,
     castlingRookStartIndex = undefined,
     castlingRookTargetIndex = undefined
   ) {
-    this.colorName = PieceNames[board.squares[from] & Piece.COLOR_MASK];
-    this.pieceName = PieceNames[board.squares[from] & Piece.PIECES_MASK];
-    this.piece = board.squares[from];
-    this.targetPiece = board.squares[to];
     this.board = board;
-    this.from = from;
-    this.to = to;
+    this.calculateFromAndTo(from, to);
     this.isHit = isHit ? true : undefined;
     this.isCheck =
       isHit && (this.targetPiece & Piece.PIECES_MASK) === Piece.KING
         ? true
         : undefined;
     this.enPassant = enPassant; // enPassant
+    this.enPassantTarget = enPassantTarget;
     this.castlingKingTargetIndex = castlingKingTargetIndex; // castling king - king position
     this.castlingRookStartIndex = castlingRookStartIndex; // castling king - rook position start
     this.castlingRookTargetIndex = castlingRookTargetIndex; // castling king - rook position target
+  }
+  calculateFromAndTo(from, to) {
+    this.from = from;
+    this.to = to;
+    this.colorName = PieceNames[this.board.squares[from] & Piece.COLOR_MASK];
+    this.pieceName = PieceNames[this.board.squares[from] & Piece.PIECES_MASK];
+    this.piece = this.board.squares[from];
+    this.pieceOnly = this.board.squares[from] & Piece.PIECES_MASK;
+    this.targetPiece = this.board.squares[to];
   }
 
   eq(other) {
@@ -524,6 +777,63 @@ class Move {
       Math.abs(this.from - this.to) === 16 // 2 move
     );
   }
+
+  getIndexes() {
+    if (this.pieceOnly === Piece.KNIGHT) {
+      return [this.from, this.to];
+    }
+    const gridFrom = this.board.indexToGrid(this.from);
+    const gridTo = this.board.indexToGrid(this.to);
+    const diff = {
+      gridY: gridTo.gridY - gridFrom.gridY,
+      gridX: gridTo.gridX - gridFrom.gridX,
+    };
+    const sign = {
+      gridY: Math.sign(diff.gridY),
+      gridX: Math.sign(diff.gridX),
+    };
+    const newGrid = {
+      gridY: gridFrom.gridY,
+      gridX: gridFrom.gridX,
+    };
+    const indexes = [];
+    while (newGrid.gridY != gridTo.gridY || newGrid.gridX != gridTo.gridX) {
+      const index = newGrid.gridY * ROW_CELLS + newGrid.gridX;
+      indexes.push(index);
+      newGrid.gridY += sign.gridY;
+      newGrid.gridX += sign.gridX;
+    }
+    return indexes;
+  }
+
+  moveToNotation() {
+    if (this.castlingRookTargetIndex && this.castlingRookStartIndex) {
+      const isLong =
+        Math.abs(this.castlingKingTargetIndex - this.castlingRookStartIndex) ===
+        3;
+      return isLong ? "O-O-O" : "O-O";
+    }
+    const sourcePieceNotation = toPieceNotation(this.piece);
+    const targetPieceNotation = toPieceNotation(this.targetPiece);
+    const sourceSquare = this.board.indexToAlgebraic(this.from);
+    const targetSquare = this.board.indexToAlgebraic(this.to);
+    const hitString = this.isHit ? "x" : "";
+    const checkString = this.isCheck ? "+" : "";
+    const enPassantString = this.enPassant ? "e.p." : "";
+    const sourceString =
+      sourcePieceNotation +
+      hitString +
+      sourceSquare +
+      enPassantString +
+      checkString;
+    const targetString =
+      targetPieceNotation +
+      hitString +
+      targetSquare +
+      enPassantString +
+      checkString;
+    return targetSquare;
+  }
 }
 
 class LegalMoves {
@@ -532,6 +842,7 @@ class LegalMoves {
     this.history = history;
     this.moves = [];
     this.color = color;
+    this.checkAttackIndexes = [];
   }
 
   eq(other) {
@@ -544,6 +855,13 @@ class LegalMoves {
     return true;
   }
 
+  getCheckMovesTo(index) {
+    return this.moves.filter((x) => x.to === index && x.isCheck);
+  }
+  getMovesTo(index) {
+    return this.moves.filter((x) => x.to === index);
+  }
+
   getMovesTo(index) {
     return this.moves.filter((x) => x.to === index);
   }
@@ -551,11 +869,11 @@ class LegalMoves {
     return this.moves.filter((x) => x.from === index);
   }
 
-  hasAnyMoveForIndex(index) {
-    return this.getMovesFrom(index).length > 0;
+  hasAnyMoveFromIndex(index) {
+    return this.moves.find((x) => x.from === index) != undefined;
   }
   hasAnyMoveToIndex(index) {
-    return this.getMovesTo(index).length > 0;
+    return this.moves.find((x) => x.to === index) != undefined;
   }
 
   addMove(move) {
@@ -565,12 +883,19 @@ class LegalMoves {
   }
 
   hasMoveForMyKing() {
+    return this.getMovesToMyKing().length > 0;
+  }
+
+  getMovesToMyKing() {
     const opponentColor = this.color ^ Piece.COLOR_MASK;
-    const index = this.boardData.anyOfPiece(Piece.KING | opponentColor);
-    console.log(
-      "Index of my KING (" + PieceNames[opponentColor] + ")=" + index
-    );
-    return this.hasAnyMoveToIndex(index);
+    const index = this.boardData.getKingPosition(opponentColor);
+    return this.getMovesTo(index);
+  }
+
+  getMovesOfMyKing() {
+    const index = this.boardData.getKingPosition(this.color);
+    console.log("Index of my KING (" + PieceNames[this.color] + ")=" + index);
+    return this.getMovesFrom(index);
   }
 
   generateMoves(color) {
@@ -593,16 +918,32 @@ class LegalMoves {
     return this;
   }
 
-  generateCastlingKings(startIndex, piece, color) {
-    if (this.history.hasMoved(piece)) return;
+  getCastlingOptions(kingPiece, color) {
+    if (this.history.hasMoved(kingPiece)) return { long: false, short: false };
     const rookPiece = Piece.ROOK | color;
-    const rookPositions = color === Piece.WHITE ? [56, 63] : [0, 7];
-
+    const rookPositions =
+      color === Piece.WHITE ? CastlingPositionsWhite : CastlingPositionsBlack;
     const rookLongMoved = this.history.hasMovedFromIndex(
       rookPiece,
       rookPositions[0]
     );
-    if (!rookLongMoved) {
+    const rookShortMoved = this.history.hasMovedFromIndex(
+      rookPiece,
+      rookPositions[1]
+    );
+    return { long: !rookLongMoved, short: !rookShortMoved };
+  }
+
+  generateCastlingKings(startIndex, piece, color) {
+    if (this.history.hasMoved(piece)) return;
+    const rookPositions =
+      color === Piece.WHITE ? CastlingPositionsWhite : CastlingPositionsBlack;
+
+    const castlingOptions = this.getCastlingOptions(piece, color);
+    const longPossible = castlingOptions.long;
+    const shortPossible = castlingOptions.short;
+
+    if (longPossible) {
       const targetIndex = rookPositions[0] + 2;
       let isEmpty = true;
       for (let index = rookPositions[0] + 1; index < startIndex; index++) {
@@ -620,20 +961,22 @@ class LegalMoves {
           }
         }
       }
-      if (isEmpty && this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)) {
+      if (
+        isEmpty &&
+        this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)
+      ) {
         isEmpty = false;
         console.log(
-          "Castling not allowed due because King " +
-            startIndex +
-            " is in check"
+          "Castling not allowed due because King " + startIndex + " is in check"
         );
       }
-    if (isEmpty) {
+      if (isEmpty) {
         const newMove = new Move(
           this.boardData,
           startIndex,
           targetIndex,
           false,
+          undefined,
           undefined,
           targetIndex,
           rookPositions[0],
@@ -643,11 +986,7 @@ class LegalMoves {
       }
     }
 
-    const rookShortMoved = this.history.hasMovedFromIndex(
-      rookPiece,
-      rookPositions[1]
-    );
-    if (!rookShortMoved) {
+    if (shortPossible) {
       let isEmpty = true;
       const targetIndex = startIndex + 2;
       for (let index = startIndex + 1; index < rookPositions[1]; index++) {
@@ -665,12 +1004,13 @@ class LegalMoves {
           }
         }
       }
-      if (isEmpty && this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)) {
+      if (
+        isEmpty &&
+        this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)
+      ) {
         isEmpty = false;
         console.log(
-          "Castling not allowed due because King " +
-            startIndex +
-            " is in check"
+          "Castling not allowed due because King " + startIndex + " is in check"
         );
       }
       if (isEmpty) {
@@ -679,6 +1019,7 @@ class LegalMoves {
           startIndex,
           targetIndex,
           false,
+          undefined,
           undefined,
           targetIndex,
           rookPositions[1],
@@ -752,6 +1093,7 @@ class LegalMoves {
       const newX = grid.gridX;
       if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
         const targetIndex = newY * 8 + newX;
+        const enPassantTargetIndex = (newY - directionOffsetY) * 8 + newX;
         if (0 <= targetIndex && targetIndex < 64) {
           const pieceOnTargetIndex = this.boardData.squares[targetIndex];
           const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
@@ -760,7 +1102,9 @@ class LegalMoves {
               this.boardData,
               startIndex,
               targetIndex,
-              false
+              false,
+              undefined,
+              enPassantTargetIndex
             );
             this.addMove(newMove);
           }
@@ -874,5 +1218,36 @@ class LegalMoves {
         } while (inc === 1 ? n < distanceToTarget : n > distanceToTarget);
       }
     }
+  }
+  removePseudoIllegalMoves(movesToCheck) {
+    this.checkAttackIndexes = [];
+    for (const move of movesToCheck) {
+      this.checkAttackIndexes.push(...move.getIndexes());
+    }
+    let movesToKeep = [];
+    for (const move of this.moves) {
+      const canPreventCheck = this.checkAttackIndexes.includes(move.to);
+      if (canPreventCheck) {
+        movesToKeep.push(move);
+      }
+    }
+    const movesOfTheKing = this.getMovesOfMyKing();
+
+    // check which are moves that are in attack by opponent
+    // opponent.to == movesOfTheKing.to
+    for (const opponentMove of this.boardData.opponentLegalMoves.moves) {
+      for (const moveOfKing of movesOfTheKing) {
+        if (moveOfKing.to !== opponentMove.to) {
+          if (
+            movesToKeep.find(
+              (x) => x.from === moveOfKing.from && x.to === moveOfKing.to
+            ) === undefined
+          ) {
+            movesToKeep.push(moveOfKing);
+          }
+        }
+      }
+    }
+    this.moves = movesToKeep;
   }
 }

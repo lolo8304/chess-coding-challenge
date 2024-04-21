@@ -71,6 +71,21 @@
               status === "ON" ? game.computerBlack.on() :  game.computerBlack.off()
           }
         }
+        document.addEventListener('DOMContentLoaded', function() {
+            setupFen();
+        });
+        function setupFen() {
+            fen = window.location.hash
+            if (!fen) {
+              fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            } else {
+              fen = fen.replace(/%20/g, ' ')
+            }
+            fenUI = window.document.getElementById("fen")
+            if (fenUI) {
+              fenUI.value = fen
+            }
+        }
     </script>
   </head>
 
@@ -78,7 +93,7 @@
     <main></main>
     <div>
         <form onsubmit="handleSubmit(event)">
-          <input id="fen" class="full-width-input" value="r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - " id="fen" />
+          <input id="fen" class="full-width-input" value="" id="fen" />
           <button type="submit">start with FEN</button>
           <button onclick="window.location.href='/'; return false" type="submit">HOME</button>
           <a href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
