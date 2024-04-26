@@ -79,7 +79,7 @@
             if (!fen) {
               fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
             } else {
-              fen = fen.replace(/%20/g, ' ')
+              fen = fen.replace(/%20/g, ' ').substring(1)
             }
             fenUI = window.document.getElementById("fen")
             if (fenUI) {

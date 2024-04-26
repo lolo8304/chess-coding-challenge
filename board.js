@@ -210,7 +210,7 @@ class BoardData {
       );
     }
     if (!castlingOptions["w"].short) {
-      this.history.push(
+      this.history.storeMove(
         new Move(
           this,
           CastlingPositionsWhite[1],
@@ -220,7 +220,7 @@ class BoardData {
       );
     }
     if (!castlingOptions["b"].long) {
-      this.history.push(
+      this.history.storeMove(
         new Move(
           this,
           CastlingPositionsBlack[0],
@@ -230,7 +230,7 @@ class BoardData {
       );
     }
     if (!castlingOptions["b"].short) {
-      this.history.push(
+      this.history.storeMove(
         new Move(
           this,
           CastlingPositionsBlack[1],
@@ -355,11 +355,6 @@ class BoardData {
       console.log("Moves " + PieceNames[opponentColor]);
       console.table(this.opponentLegalMoves.moves);
     }
-    if (this.selectedIndex != NOT_SELECTED) {
-      this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
-        this.selectedIndex
-      );
-    }
     //for (const move of this.opponentLegalMoves.moves) {
     //  this.debuggingIndexes.push(move);
     //}
@@ -367,6 +362,16 @@ class BoardData {
     if (movesToCheck.length > 0) {
       this.check = true;
       this.legalMoves.removePseudoIllegalMoves(movesToCheck);
+    }
+    if (this.selectedIndex != NOT_SELECTED) {
+      this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
+        this.selectedIndex
+      );
+      const selectedPiece = this.squares[this.selectedIndex];
+      const selectedPieceOnly = selectedPiece & Piece.PIECES_MASK;
+      if (selectedPieceOnly === Piece.KING) {
+        this.legalMovesForSelectedIndex = this.legalMoves.removePseudoIllegalMovesSelectedKing(this.legalMovesForSelectedIndex);
+      }
     }
   }
 
@@ -760,8 +765,9 @@ class Move {
     this.colorName = PieceNames[this.board.squares[from] & Piece.COLOR_MASK];
     this.pieceName = PieceNames[this.board.squares[from] & Piece.PIECES_MASK];
     this.piece = this.board.squares[from];
-    this.pieceOnly = this.board.squares[from] & Piece.PIECES_MASK;
+    this.pieceOnly = this.piece & Piece.PIECES_MASK;
     this.targetPiece = this.board.squares[to];
+    this.targetPieceOnly = this.targetPiece & Piece.PIECES_MASK;
   }
 
   eq(other) {
@@ -923,14 +929,21 @@ class LegalMoves {
     const rookPiece = Piece.ROOK | color;
     const rookPositions =
       color === Piece.WHITE ? CastlingPositionsWhite : CastlingPositionsBlack;
-    const rookLongMoved = this.history.hasMovedFromIndex(
-      rookPiece,
-      rookPositions[0]
-    );
-    const rookShortMoved = this.history.hasMovedFromIndex(
-      rookPiece,
-      rookPositions[1]
-    );
+
+    const rookLongPiece = this.boardData.squares[rookPositions[0]];
+    const rookLongStillThere =
+      (rookLongPiece & Piece.PIECES_MASK) === Piece.ROOK &&
+      (rookLongPiece & Piece.COLOR_MASK) === color;
+    const rookLongMoved =
+      !rookLongStillThere ||
+      this.history.hasMovedFromIndex(rookPiece, rookPositions[0]);
+    const rookShortPiece = this.boardData.squares[rookPositions[1]];
+    const rookShortStillThere =
+      (rookShortPiece & Piece.PIECES_MASK) === Piece.ROOK &&
+      (rookShortPiece & Piece.COLOR_MASK) === color;
+    const rookShortMoved =
+      !rookShortStillThere ||
+      this.history.hasMovedFromIndex(rookPiece, rookPositions[1]);
     return { long: !rookLongMoved, short: !rookShortMoved };
   }
 
@@ -1219,6 +1232,19 @@ class LegalMoves {
       }
     }
   }
+
+  removePseudoIllegalMovesSelectedKing(legalMovesForSelectedIndex) {
+    const movesToKeep = []
+    for (const moveOfKing of legalMovesForSelectedIndex) {
+      // check if any opponent move target at the legal move target
+      let hasAnyCheck = this.boardData.opponentLegalMoves.hasAnyMoveToIndex(moveOfKing.to)
+      if (!hasAnyCheck) {
+        movesToKeep.push(moveOfKing);
+      }
+    }
+    return movesToKeep
+  }
+
   removePseudoIllegalMoves(movesToCheck) {
     this.checkAttackIndexes = [];
     for (const move of movesToCheck) {
@@ -1227,27 +1253,33 @@ class LegalMoves {
     let movesToKeep = [];
     for (const move of this.moves) {
       const canPreventCheck = this.checkAttackIndexes.includes(move.to);
-      if (canPreventCheck) {
+      if (canPreventCheck && move.pieceOnly !== Piece.KING) {
         movesToKeep.push(move);
       }
     }
     const movesOfTheKing = this.getMovesOfMyKing();
+    console.table(movesToKeep);
 
     // check which are moves that are in attack by opponent
     // opponent.to == movesOfTheKing.to
-    for (const opponentMove of this.boardData.opponentLegalMoves.moves) {
-      for (const moveOfKing of movesOfTheKing) {
-        if (moveOfKing.to !== opponentMove.to) {
-          if (
-            movesToKeep.find(
-              (x) => x.from === moveOfKing.from && x.to === moveOfKing.to
-            ) === undefined
-          ) {
-            movesToKeep.push(moveOfKing);
+    for (const moveOfKing of movesOfTheKing) {
+      const kingsTargetInAttackLineNotAllowed =
+        this.checkAttackIndexes.includes(moveOfKing.to);
+      if (!kingsTargetInAttackLineNotAllowed) {
+        for (const opponentMove of this.boardData.opponentLegalMoves.moves) {
+          if (moveOfKing.to !== opponentMove.to) {
+            if (
+              movesToKeep.find(
+                (x) => x.from === moveOfKing.from && x.to === moveOfKing.to
+              ) === undefined
+            ) {
+              movesToKeep.push(moveOfKing);
+            }
           }
         }
       }
     }
+    console.table(movesToKeep);
     this.moves = movesToKeep;
   }
 }
