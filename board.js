@@ -358,11 +358,17 @@ class BoardData {
     //for (const move of this.opponentLegalMoves.moves) {
     //  this.debuggingIndexes.push(move);
     //}
-    const movesToCheck = this.getMovesAsIamUnderCheck();
-    if (movesToCheck.length > 0) {
+    const movesToCheckForMe = this.getMovesAsIamUnderCheck();
+    if (movesToCheckForMe.length > 0) {
       this.check = true;
-      this.legalMoves.removePseudoIllegalMoves(movesToCheck);
+      this.legalMoves.removePseudoIllegalMoves(movesToCheckForMe);
     }
+    const movesToCheckFromMe = this.getMovesAsIamOfferingCheck();
+    if (movesToCheckFromMe.length > 0) {
+      this.check = true;
+      this.legalMoves.removePseudoIllegalMoves(movesToCheckFromMe);
+    }
+
     if (this.selectedIndex != NOT_SELECTED) {
       this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
         this.selectedIndex
@@ -370,7 +376,10 @@ class BoardData {
       const selectedPiece = this.squares[this.selectedIndex];
       const selectedPieceOnly = selectedPiece & Piece.PIECES_MASK;
       if (selectedPieceOnly === Piece.KING) {
-        this.legalMovesForSelectedIndex = this.legalMoves.removePseudoIllegalMovesSelectedKing(this.legalMovesForSelectedIndex);
+        this.legalMovesForSelectedIndex =
+          this.legalMoves.removePseudoIllegalMovesSelectedKing(
+            this.legalMovesForSelectedIndex
+          );
       }
     }
   }
@@ -395,6 +404,10 @@ class BoardData {
   getMovesAsIamUnderCheck() {
     return this.opponentLegalMoves.getMovesToMyKing();
   }
+  getMovesAsIamOfferingCheck() {
+    return this.legalMoves.getMovesToMyKing();
+  }
+
   indexesOfPiece(piece) {
     const pieceOnly = piece & Piece.PIECES_MASK;
     return this.squares.filter((x) => (x & Piece.PIECES_MASK) === pieceOnly);
@@ -809,7 +822,9 @@ class Move {
       newGrid.gridY += sign.gridY;
       newGrid.gridX += sign.gridX;
     }
-    return indexes;
+    const index = newGrid.gridY * ROW_CELLS + newGrid.gridX;
+    indexes.push(index);
+  return indexes;
   }
 
   moveToNotation() {
@@ -1234,15 +1249,17 @@ class LegalMoves {
   }
 
   removePseudoIllegalMovesSelectedKing(legalMovesForSelectedIndex) {
-    const movesToKeep = []
+    const movesToKeep = [];
     for (const moveOfKing of legalMovesForSelectedIndex) {
       // check if any opponent move target at the legal move target
-      let hasAnyCheck = this.boardData.opponentLegalMoves.hasAnyMoveToIndex(moveOfKing.to)
+      let hasAnyCheck = this.boardData.opponentLegalMoves.hasAnyMoveToIndex(
+        moveOfKing.to
+      );
       if (!hasAnyCheck) {
         movesToKeep.push(moveOfKing);
       }
     }
-    return movesToKeep
+    return movesToKeep;
   }
 
   removePseudoIllegalMoves(movesToCheck) {
