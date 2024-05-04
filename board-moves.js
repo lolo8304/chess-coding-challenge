@@ -26,14 +26,14 @@ class Move {
   calculateFromAndTo(from, to) {
     this.from = from;
     this.to = to;
-    this.color = this.board.getPiece(from) & Piece.COLOR_MASK
+    this.color = this.board.getPiece(from) & Piece.COLOR_MASK;
     this.colorName = PieceNames[this.board.getPiece(from) & Piece.COLOR_MASK];
     this.pieceName = PieceNames[this.board.getPiece(from) & Piece.PIECES_MASK];
     this.piece = this.board.getPiece(from);
     this.pieceOnly = this.piece & Piece.PIECES_MASK;
     this.targetPiece = this.board.getPiece(to);
     this.targetPieceOnly = this.targetPiece & Piece.PIECES_MASK;
-    this.targetColor = this.targetPiece & Piece.COLOR_MASK
+    this.targetColor = this.targetPiece & Piece.COLOR_MASK;
   }
 
   eq(other) {
@@ -74,6 +74,7 @@ class Move {
       indexes.push(index);
       newGrid.gridY += sign.gridY;
       newGrid.gridX += sign.gridX;
+      console.log("run for index " + index);
     }
     const index = newGrid.gridY * ROW_CELLS + newGrid.gridX;
     indexes.push(index);
@@ -131,7 +132,7 @@ class LegalMoves {
     this.color = color;
     this.moves = [];
     this.checkAttackIndexes = [];
-    this.checkAttackOnPinnedPieces = []
+    this.checkAttackOnPinnedPieces = [];
   }
 
   eq(other) {
@@ -197,7 +198,8 @@ class LegalMoves {
 
   getMovesOfMyKing() {
     const index = this.boardData.getKingPosition(this.color);
-    console.log("Index of my KING (" + PieceNames[this.color] + ")=" + index);
+    verbose &&
+      console.log("Index of my KING (" + PieceNames[this.color] + ")=" + index);
     return this.getMovesFrom(index);
   }
 
@@ -215,7 +217,7 @@ class LegalMoves {
   }
 
   generateMoves(color) {
-    color = color || this.color
+    color = color || this.color;
     const newMoves = [];
     const pieces = this.boardData.getPiecesCacheByColor(color); // [ {piece: <int>, indexes: [ int, int ]} ]
     for (const pieceAndIndexes of pieces) {
@@ -272,7 +274,8 @@ class LegalMoves {
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (targetIndex <= index && index < startIndex) {
           if (this.boardData.opponentLegalMoves.hasAnyMoveToIndex(index)) {
-            console.log("Castling not allowed due to attack on " + index);
+            verbose &&
+              console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
             break;
           }
@@ -283,9 +286,12 @@ class LegalMoves {
         this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)
       ) {
         isEmpty = false;
-        console.log(
-          "Castling not allowed due because King " + startIndex + " is in check"
-        );
+        verbose &&
+          console.log(
+            "Castling not allowed due because King " +
+              startIndex +
+              " is in check"
+          );
       }
       if (isEmpty) {
         const newMove = new Move(
@@ -315,7 +321,8 @@ class LegalMoves {
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (startIndex < index && index <= targetIndex) {
           if (this.boardData.opponentLegalMoves.hasAnyMoveToIndex(index)) {
-            console.log("Castling not allowed due to attack on " + index);
+            verbose &&
+              console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
             break;
           }
@@ -326,9 +333,12 @@ class LegalMoves {
         this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)
       ) {
         isEmpty = false;
-        console.log(
-          "Castling not allowed due because King " + startIndex + " is in check"
-        );
+        verbose &&
+          console.log(
+            "Castling not allowed due because King " +
+              startIndex +
+              " is in check"
+          );
       }
       if (isEmpty) {
         const newMove = new Move(
@@ -351,20 +361,31 @@ class LegalMoves {
     const oppositeColor = color ^ Piece.COLOR_MASK;
     for (let i = 0; i < directionOffsets.length; i++) {
       const targetIndex = startIndex + directionOffsets[i];
-      const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
-      const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
-      if (pieceOnTargetIndexColor === color) {
-        // skip
-      } else if (pieceOnTargetIndexColor === oppositeColor) {
-        this.addMoveTo(
-          new Move(this.boardData, startIndex, targetIndex, true),
-          newMoves
-        );
+      const grid = this.boardData.indexToGrid(startIndex);
+      const targetGrid = this.boardData.indexToGrid(targetIndex);
+      if (
+        (grid.gridX === 0 && targetGrid.gridX == 7) ||
+        (grid.gridX === 7 && targetGrid.gridX === 0) ||
+        (grid.gridY === 0 && targetGrid.gridY === 7) ||
+        (grid.gridY === 7 && targetGrid.gridY === 0)
+      ) {
+        // no moves allowed over edges
       } else {
-        this.addMoveTo(
-          new Move(this.boardData, startIndex, targetIndex, false),
-          newMoves
-        );
+        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
+        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+        if (pieceOnTargetIndexColor === color) {
+          // skip
+        } else if (pieceOnTargetIndexColor === oppositeColor) {
+          this.addMoveTo(
+            new Move(this.boardData, startIndex, targetIndex, true),
+            newMoves
+          );
+        } else {
+          this.addMoveTo(
+            new Move(this.boardData, startIndex, targetIndex, false),
+            newMoves
+          );
+        }
       }
     }
   }
@@ -568,7 +589,7 @@ class LegalMoves {
   limitingMovementPinnedPieces() {
     // current legal moves: check for all moves if opponent offers new attacks to king if piece would move away
     const movesOfNotKing = this.moves.filter((x) => x.pieceOnly != Piece.KING);
-    this.checkAttackOnPinnedPieces = []
+    this.checkAttackOnPinnedPieces = [];
     for (const move of movesOfNotKing) {
       this.boardData.setPieceInternal(move.from, 0);
       const oldTargetPiece = this.boardData.setPieceInternal(
@@ -576,12 +597,16 @@ class LegalMoves {
         move.piece
       );
       let newMoves = this.boardData.opponentLegalMoves.generateMoves();
-      newMoves = newMoves.filter((x) => x.isHit && x.targetPieceOnly === Piece.KING);
+      newMoves = newMoves.filter(
+        (x) => x.isHit && x.targetPieceOnly === Piece.KING
+      );
       this.boardData.setPieceInternal(move.from, move.piece);
       this.boardData.setPieceInternal(move.to, oldTargetPiece);
       if (newMoves.length > 0) {
-        this.checkAttackOnPinnedPieces.push(...newMoves.flatMap(x => x.getIndexes()))
-        this.moves = this.moves.filter(x => !x.eq(move))
+        this.checkAttackOnPinnedPieces.push(
+          ...newMoves.flatMap((x) => x.getIndexes())
+        );
+        this.moves = this.moves.filter((x) => !x.eq(move));
       }
     }
   }
@@ -621,7 +646,7 @@ class LegalMoves {
       }
     }
     // check if new opponent hits would check the king
-    const movesToKeepWithoutCheck = []
+    const movesToKeepWithoutCheck = [];
     for (const moveOfKing of movesToKeep) {
       if (moveOfKing.pieceOnly === Piece.KING) {
         this.boardData.setPieceInternal(moveOfKing.from, 0);
@@ -631,17 +656,19 @@ class LegalMoves {
         );
 
         let newMoves = this.boardData.opponentLegalMoves.generateMoves();
-        newMoves = newMoves.filter((x) => x.isHit && x.targetPieceOnly === Piece.KING);
+        newMoves = newMoves.filter(
+          (x) => x.isHit && x.targetPieceOnly === Piece.KING
+        );
         if (newMoves.length == 0) {
-          movesToKeepWithoutCheck.push(moveOfKing)
+          movesToKeepWithoutCheck.push(moveOfKing);
         } else {
-          console.log("Remove move for king to go into check")
+          verbose && console.log("Remove move for king to go into check");
         }
 
         this.boardData.setPieceInternal(moveOfKing.from, moveOfKing.piece);
         this.boardData.setPieceInternal(moveOfKing.to, oldTargetPiece);
       } else {
-        movesToKeepWithoutCheck.push(moveOfKing)
+        movesToKeepWithoutCheck.push(moveOfKing);
       }
     }
     console.table(movesToKeepWithoutCheck);

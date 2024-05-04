@@ -27,7 +27,7 @@ class BoardData {
   }
 
   setPiece(index, piece) {
-    console.log(
+    verbose && console.log(
       "SET " +
         index +
         " = " +
@@ -256,10 +256,12 @@ class BoardData {
     if (oldLegalMoves.color != color || !newLegalMoves.eq(oldLegalMoves)) {
       this.legalMoves = newLegalMoves;
       this.opponentLegalMoves = this.newLegalMovesFor(opponentColor);
-      console.log("Moves " + PieceNames[color]);
-      console.table(this.legalMoves.moves);
-      console.log("Moves " + PieceNames[opponentColor]);
-      console.table(this.opponentLegalMoves.moves);
+      if (verbose >= 2) {
+        console.log("Moves " + PieceNames[color]);
+        console.table(this.legalMoves.moves);
+        console.log("Moves " + PieceNames[opponentColor]);
+        console.table(this.opponentLegalMoves.moves);
+      }
     }
     //for (const move of this.opponentLegalMoves.moves) {
     //  this.debuggingIndexes.push(move);

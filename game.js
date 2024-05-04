@@ -46,7 +46,6 @@ class Game {
       turnText = this.board.data.result;
       fill("red");
       rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
-      noLoop()
     }
     const fontSize = this.w > 600 ? 40 : (this.w > 400 ? 30 : 20);
     textSize(fontSize);

@@ -39,8 +39,6 @@ class Board {
   }
   toGrid(y, x) {
     circle(x, y, 10, "pink");
-    //console.log("x: " + this.x + " <= " + x + " < " + (this.x + this.w));
-    //console.log("y: " + this.y + " <= " + y + " < " + (this.y + this.h));
     if (
       this.x <= x &&
       x < this.x + this.w &&
@@ -211,10 +209,8 @@ class Board {
     const grid = this.toGrid(clientY, clientX);
     if (grid) {
       const cell = this.cell(grid.gridY, grid.gridX);
-      //console.log(this.cellToString(cell));
-      //console.log(this.cellToString(this.cellToName(cell)));
     } else {
-      console.log("Out of board");
+      verbose && console.log("Out of board");
     }
   }
 
