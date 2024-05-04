@@ -46,11 +46,13 @@ class Game {
       turnText = this.board.data.result;
       fill("red");
       rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
+      noLoop()
     }
-    textSize(40);
+    const fontSize = this.w > 600 ? 40 : (this.w > 400 ? 30 : 20);
+    textSize(fontSize);
     fill("white");
     textAlign(CENTER);
-    text(turnText, this.x + this.w / 2, this.y - this.paddingTop + 50);
+    text(turnText, this.x + this.w / 2, this.y - this.paddingTop + this.paddingTop / 2 + (fontSize-10) / 2);
     if (this.time > 1.0) {
       const movedBlack = this.computerMoveNow(this.computerBlack, 0);
       const movedWhite = this.computerMoveNow(this.computerWhite, 0);
@@ -65,10 +67,6 @@ class Game {
       this.time = 0;
     }
     this.time += this.velocity;
-  }
-
-  drawBoad() {
-    this.board.draw();
   }
 
   makeMove(move, depth) {

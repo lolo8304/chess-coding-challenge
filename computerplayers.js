@@ -86,7 +86,7 @@ class ComputerPlayerRandomHitFirst extends ComputerPlayer {
     super(name, boardData, color);
   }
   bestMove(legalMoves) {
-    const hits = legalMoves.moves.filter((x) => x.isHit);
+    const hits = legalMoves.moves.filter((x) => x.isHit).filter(x => x.targetPieceOnly !== Piece.KING);
     const noHits = legalMoves.moves.filter((x) => !x.isHit);
     if (hits.length > 0) {
       const randomMove = Math.floor(random(hits.length));

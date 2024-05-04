@@ -1,6 +1,7 @@
 class BoardData {
   constructor(history, fen) {
     this.check = false;
+    this.checkMate = false;
     this.debuggingIndexes = [];
     this.history = history;
     this.squares = new Array(64).fill(0);
@@ -41,7 +42,7 @@ class BoardData {
     );
     return this.setPieceInternal(index, piece);
   }
-  
+
   setPieceInternal(index, piece) {
     const oldPiece = this.getPiece(index);
     this.squares[index] = piece;
@@ -105,7 +106,7 @@ class BoardData {
       },
     };
     if (!castlingOptions["w"].long) {
-      this.history.push(
+      this.history.storeMove(
         new Move(
           this,
           CastlingPositionsWhite[0],
@@ -290,6 +291,10 @@ class BoardData {
       this.legalMovesForSelectedIndex = [];
     }
     this.legalMoves.limitingMovementPinnedPieces();
+    if (this.check && this.legalMoves.moves.length === 0) {
+      this.checkMate = true;
+      this.result = "CHECK MATE: " + PieceNames[this.opponentLegalMoves.color];
+    }
   }
 
   newLegalMovesFor(color) {

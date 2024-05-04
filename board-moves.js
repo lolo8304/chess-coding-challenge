@@ -620,7 +620,31 @@ class LegalMoves {
         }
       }
     }
-    console.table(movesToKeep);
-    this.moves = movesToKeep;
+    // check if new opponent hits would check the king
+    const movesToKeepWithoutCheck = []
+    for (const moveOfKing of movesToKeep) {
+      if (moveOfKing.pieceOnly === Piece.KING) {
+        this.boardData.setPieceInternal(moveOfKing.from, 0);
+        const oldTargetPiece = this.boardData.setPieceInternal(
+          moveOfKing.to,
+          moveOfKing.piece
+        );
+
+        let newMoves = this.boardData.opponentLegalMoves.generateMoves();
+        newMoves = newMoves.filter((x) => x.isHit && x.targetPieceOnly === Piece.KING);
+        if (newMoves.length == 0) {
+          movesToKeepWithoutCheck.push(moveOfKing)
+        } else {
+          console.log("Remove move for king to go into check")
+        }
+
+        this.boardData.setPieceInternal(moveOfKing.from, moveOfKing.piece);
+        this.boardData.setPieceInternal(moveOfKing.to, oldTargetPiece);
+      } else {
+        movesToKeepWithoutCheck.push(moveOfKing)
+      }
+    }
+    console.table(movesToKeepWithoutCheck);
+    this.moves = movesToKeepWithoutCheck;
   }
 }
