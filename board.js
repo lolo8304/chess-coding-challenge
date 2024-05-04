@@ -58,7 +58,7 @@ class Board {
 
   drawCell(gridY, gridX) {
     const index = gridY * ROW_CELLS + gridX;
-    const piece = this.data.squares[index];
+    const piece = this.data.getPiece(index);
     const isWhite = (piece & Piece.WHITE) > 0;
 
     if (this.data.selectedIndex === index) {
@@ -108,9 +108,11 @@ class Board {
     const checkMoves = this.data.opponentLegalMoves.getCheckMovesTo(index);
     const isInCheckAttack =
       this.data.legalMoves.checkAttackIndexes.includes(index);
+    const isInCheckAttackInPinnedPieces =
+      this.data.legalMoves.checkAttackOnPinnedPieces.includes(index);
     if (
       (this.data.isNotFinished() && checkMoves.length > 0) ||
-      isInCheckAttack
+      isInCheckAttack || isInCheckAttackInPinnedPieces
     ) {
       fill("rgba(255, 255, 0, 0.4)");
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
@@ -164,7 +166,7 @@ class Board {
   }
 
   square(gridY, gridX) {
-    return this.data.squares[gridY * ROW_CELLS + gridX];
+    return this.data.getPiece(gridY * ROW_CELLS + gridX);
   }
 
   piece(gridY, gridX) {
@@ -235,41 +237,10 @@ class Board {
     return undefined;
   }
 
-  makeMove(move) {
-    this.data.enPassantMove = undefined;
-    if (move.isEnPassantAttackable()) {
-      this.data.enPassantMove = move;
-    }
-    this.data.history.storeMove(move);
-    this.data.squares[move.to] = this.data.squares[move.from];
-    this.data.squares[move.from] = Piece.None;
-    if (move.enPassant) {
-      this.data.squares[move.enPassant] = Piece.None;
-    }
-    if (move.castlingKingTargetIndex) {
-      this.data.squares[move.castlingRookTargetIndex] =
-        this.data.squares[move.castlingRookStartIndex];
-      this.data.squares[move.castlingRookStartIndex] = Piece.None;
-    }
-    this.selectCellIndex(NOT_SELECTED);
-    if (move.enPassant) {
-      this.data.enPassantMove = undefined;
-    }
-    if (move.pieceOnly === Piece.PAWN || move.isHit) {
-      this.data.resetHalfMoveCounter();
-    } else {
-      this.data.incHalfMoveCounter();
-    }
-    if (this.data.halfMoveCounter === 100) {
-      const confirmed = window.confirm("50 move rule - confirm to offer DRAW?");
-      if (confirmed) {
-        this.data.result = "DRAW - agreed by 50-move rule ";
-      }
-    }
-    if (this.data.halfMoveCounter === 150) {
-      this.data.result = "DRAW - forced by 75-move rule";
-    }
+  makeMove(move, withHalfMoves) {
+    this.data.makeMove(move, withHalfMoves)
   }
+
 
   selectCellIndex(index) {
     this.data.selectCellIndex(index);

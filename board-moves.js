@@ -1,4 +1,3 @@
-
 class Move {
   constructor(
     board,
@@ -27,12 +26,14 @@ class Move {
   calculateFromAndTo(from, to) {
     this.from = from;
     this.to = to;
-    this.colorName = PieceNames[this.board.squares[from] & Piece.COLOR_MASK];
-    this.pieceName = PieceNames[this.board.squares[from] & Piece.PIECES_MASK];
-    this.piece = this.board.squares[from];
+    this.color = this.board.getPiece(from) & Piece.COLOR_MASK
+    this.colorName = PieceNames[this.board.getPiece(from) & Piece.COLOR_MASK];
+    this.pieceName = PieceNames[this.board.getPiece(from) & Piece.PIECES_MASK];
+    this.piece = this.board.getPiece(from);
     this.pieceOnly = this.piece & Piece.PIECES_MASK;
-    this.targetPiece = this.board.squares[to];
+    this.targetPiece = this.board.getPiece(to);
     this.targetPieceOnly = this.targetPiece & Piece.PIECES_MASK;
+    this.targetColor = this.targetPiece & Piece.COLOR_MASK
   }
 
   eq(other) {
@@ -107,15 +108,30 @@ class Move {
       checkString;
     return targetSquare;
   }
+
+  makeMove() {
+    this.board.setPiece(this.to, this.board.getPiece(this.from));
+    this.board.setPiece(this.from, Piece.None);
+    if (this.enPassant) {
+      this.board.setPiece(this.enPassant, Piece.None);
+    }
+    if (this.castlingKingTargetIndex) {
+      this.board.setPiece(
+        this.castlingRookTargetIndex,
+        this.board.getPiece(this.castlingRookStartIndex)
+      );
+      this.board.setPiece(this.castlingRookStartIndex, Piece.None);
+    }
+  }
 }
 
 class LegalMoves {
-  constructor(color, boardData, history) {
+  constructor(color, boardData) {
     this.boardData = boardData;
-    this.history = history;
-    this.moves = [];
     this.color = color;
+    this.moves = [];
     this.checkAttackIndexes = [];
+    this.checkAttackOnPinnedPieces = []
   }
 
   eq(other) {
@@ -148,10 +164,24 @@ class LegalMoves {
   hasAnyMoveToIndex(index) {
     return this.moves.find((x) => x.to === index) != undefined;
   }
-
+  addMoveTo(move, newMoves) {
+    if (0 <= move.to && move.to < 64) {
+      newMoves.push(move);
+    }
+  }
   addMove(move) {
     if (0 <= move.to && move.to < 64) {
       this.moves.push(move);
+    }
+  }
+
+  addMove(move, newMoves) {
+    if (0 <= move.to && move.to < 64) {
+      if (newMoves) {
+        newMoves.push(move);
+      } else {
+        this.moves.push(move);
+      }
     }
   }
 
@@ -171,51 +201,58 @@ class LegalMoves {
     return this.getMovesFrom(index);
   }
 
+  generateMoveForPieceFromIndex(newMoves, index, piece, color) {
+    if (isSlidingPiece(piece)) {
+      this.generateSlidingMoves(newMoves, index, piece, color);
+    } else if (isKing(piece)) {
+      this.generateKingMoves(newMoves, index, piece, color);
+      this.generateCastlingKings(newMoves, index, piece, color);
+    } else if (isKnight(piece)) {
+      this.generateKnightMoves(newMoves, index, piece, color);
+    } else if (isPawn(piece)) {
+      this.generatePawnMoves(newMoves, index, piece, color);
+    }
+  }
+
   generateMoves(color) {
-    for (let start = 0; start < this.boardData.squares.length; start++) {
-      const piece = this.boardData.squares[start];
-      const ownColor = piece & color;
-      if (ownColor > 0) {
-        if (isSlidingPiece(piece)) {
-          this.generateSlidingMoves(start, piece, color);
-        } else if (isKing(piece)) {
-          this.generateKingMoves(start, piece, color);
-          this.generateCastlingKings(start, piece, color);
-        } else if (isKnight(piece)) {
-          this.generateKnightMoves(start, piece, color);
-        } else if (isPawn(piece)) {
-          this.generatePawnMoves(start, piece, color);
-        }
+    color = color || this.color
+    const newMoves = [];
+    const pieces = this.boardData.getPiecesCacheByColor(color); // [ {piece: <int>, indexes: [ int, int ]} ]
+    for (const pieceAndIndexes of pieces) {
+      for (const index of pieceAndIndexes.indexes) {
+        const piece = pieceAndIndexes.piece;
+        this.generateMoveForPieceFromIndex(newMoves, index, piece, color);
       }
     }
-    return this;
+    return newMoves;
   }
 
   getCastlingOptions(kingPiece, color) {
-    if (this.history.hasMoved(kingPiece)) return { long: false, short: false };
+    if (this.boardData.history.hasMoved(kingPiece))
+      return { long: false, short: false };
     const rookPiece = Piece.ROOK | color;
     const rookPositions =
       color === Piece.WHITE ? CastlingPositionsWhite : CastlingPositionsBlack;
 
-    const rookLongPiece = this.boardData.squares[rookPositions[0]];
+    const rookLongPiece = this.boardData.getPiece(rookPositions[0]);
     const rookLongStillThere =
       (rookLongPiece & Piece.PIECES_MASK) === Piece.ROOK &&
       (rookLongPiece & Piece.COLOR_MASK) === color;
     const rookLongMoved =
       !rookLongStillThere ||
-      this.history.hasMovedFromIndex(rookPiece, rookPositions[0]);
-    const rookShortPiece = this.boardData.squares[rookPositions[1]];
+      this.boardData.history.hasMovedFromIndex(rookPiece, rookPositions[0]);
+    const rookShortPiece = this.boardData.getPiece(rookPositions[1]);
     const rookShortStillThere =
       (rookShortPiece & Piece.PIECES_MASK) === Piece.ROOK &&
       (rookShortPiece & Piece.COLOR_MASK) === color;
     const rookShortMoved =
       !rookShortStillThere ||
-      this.history.hasMovedFromIndex(rookPiece, rookPositions[1]);
+      this.boardData.history.hasMovedFromIndex(rookPiece, rookPositions[1]);
     return { long: !rookLongMoved, short: !rookShortMoved };
   }
 
-  generateCastlingKings(startIndex, piece, color) {
-    if (this.history.hasMoved(piece)) return;
+  generateCastlingKings(newMoves, startIndex, piece, color) {
+    if (this.boardData.history.hasMoved(piece)) return;
     const rookPositions =
       color === Piece.WHITE ? CastlingPositionsWhite : CastlingPositionsBlack;
 
@@ -227,7 +264,7 @@ class LegalMoves {
       const targetIndex = rookPositions[0] + 2;
       let isEmpty = true;
       for (let index = rookPositions[0] + 1; index < startIndex; index++) {
-        const shouldBeEmptyPiece = this.boardData.squares[index];
+        const shouldBeEmptyPiece = this.boardData.getPiece(index);
         if (shouldBeEmptyPiece != 0) {
           isEmpty = false;
           break;
@@ -262,7 +299,7 @@ class LegalMoves {
           rookPositions[0],
           targetIndex + 1
         );
-        this.addMove(newMove);
+        this.addMoveTo(newMove, newMoves);
       }
     }
 
@@ -270,7 +307,7 @@ class LegalMoves {
       let isEmpty = true;
       const targetIndex = startIndex + 2;
       for (let index = startIndex + 1; index < rookPositions[1]; index++) {
-        const shouldBeEmptyPiece = this.boardData.squares[index];
+        const shouldBeEmptyPiece = this.boardData.getPiece(index);
         if (shouldBeEmptyPiece != 0) {
           isEmpty = false;
           break;
@@ -305,27 +342,33 @@ class LegalMoves {
           rookPositions[1],
           targetIndex - 1
         );
-        this.addMove(newMove);
+        this.addMoveTo(newMove, newMoves);
       }
     }
   }
 
-  generateKingMoves(startIndex, piece, color) {
+  generateKingMoves(newMoves, startIndex, piece, color) {
     const oppositeColor = color ^ Piece.COLOR_MASK;
     for (let i = 0; i < directionOffsets.length; i++) {
       const targetIndex = startIndex + directionOffsets[i];
-      const pieceOnTargetIndex = this.boardData.squares[targetIndex];
+      const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
       const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
       if (pieceOnTargetIndexColor === color) {
         // skip
       } else if (pieceOnTargetIndexColor === oppositeColor) {
-        this.addMove(new Move(this.boardData, startIndex, targetIndex, true));
+        this.addMoveTo(
+          new Move(this.boardData, startIndex, targetIndex, true),
+          newMoves
+        );
       } else {
-        this.addMove(new Move(this.boardData, startIndex, targetIndex, false));
+        this.addMoveTo(
+          new Move(this.boardData, startIndex, targetIndex, false),
+          newMoves
+        );
       }
     }
   }
-  generateKnightMoves(startIndex, piece, color) {
+  generateKnightMoves(newMoves, startIndex, piece, color) {
     //
     const knightsDirectionOffsetsYX = [
       [-2, -1],
@@ -345,21 +388,25 @@ class LegalMoves {
       const newX = grid.gridX + knightsGridDiff[1];
       if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
         const targetIndex = newY * 8 + newX;
-        const pieceOnTargetIndex = this.boardData.squares[targetIndex];
+        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
         const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
         if (pieceOnTargetIndexColor === color) {
           // skip
         } else if (pieceOnTargetIndexColor === oppositeColor) {
-          this.addMove(new Move(this.boardData, startIndex, targetIndex, true));
+          this.addMoveTo(
+            new Move(this.boardData, startIndex, targetIndex, true),
+            newMoves
+          );
         } else {
-          this.addMove(
-            new Move(this.boardData, startIndex, targetIndex, false)
+          this.addMoveTo(
+            new Move(this.boardData, startIndex, targetIndex, false),
+            newMoves
           );
         }
       }
     }
   }
-  generatePawnMoves(startIndex, piece, color) {
+  generatePawnMoves(newMoves, startIndex, piece, color) {
     const startPawnIndex = (color & Piece.WHITE) > 0 ? 6 : 1;
     const directionOffsetY = (color & Piece.WHITE) > 0 ? -1 : 1;
 
@@ -375,7 +422,7 @@ class LegalMoves {
         const targetIndex = newY * 8 + newX;
         const enPassantTargetIndex = (newY - directionOffsetY) * 8 + newX;
         if (0 <= targetIndex && targetIndex < 64) {
-          const pieceOnTargetIndex = this.boardData.squares[targetIndex];
+          const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
           const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
           if (pieceOnTargetIndexColor === 0) {
             const newMove = new Move(
@@ -386,7 +433,7 @@ class LegalMoves {
               undefined,
               enPassantTargetIndex
             );
-            this.addMove(newMove);
+            this.addMoveTo(newMove, newMoves);
           }
         }
       }
@@ -397,7 +444,7 @@ class LegalMoves {
     if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
       const targetIndex = newY * 8 + newX;
       if (0 <= targetIndex && targetIndex < 64) {
-        const pieceOnTargetIndex = this.boardData.squares[targetIndex];
+        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
         const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
         if (pieceOnTargetIndexColor === 0) {
           const newMove = new Move(
@@ -406,7 +453,7 @@ class LegalMoves {
             targetIndex,
             false
           );
-          this.addMove(newMove);
+          this.addMoveTo(newMove, newMoves);
         }
       }
     }
@@ -418,7 +465,7 @@ class LegalMoves {
       newX = grid.gridX + dirX;
       if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
         const targetIndex = newY * 8 + newX;
-        const pieceOnTargetIndex = this.boardData.squares[targetIndex];
+        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
         const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
         if (pieceOnTargetIndexColor === oppositeColor) {
           const newMove = new Move(
@@ -427,7 +474,7 @@ class LegalMoves {
             targetIndex,
             true
           );
-          this.addMove(newMove);
+          this.addMoveTo(newMove, newMoves);
         } else if (pieceOnTargetIndexColor === 0) {
           // check for en-passang
           newY = grid.gridY;
@@ -435,7 +482,7 @@ class LegalMoves {
           if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
             const targetEnPIndex = newY * 8 + newX;
             const pieceEnPOnTargetIndex =
-              this.boardData.squares[targetEnPIndex];
+              this.boardData.getPiece(targetEnPIndex);
             const pieceEnPOnTargetIndexColor =
               pieceEnPOnTargetIndex & Piece.COLOR_MASK;
             if (pieceEnPOnTargetIndexColor === oppositeColor) {
@@ -447,7 +494,7 @@ class LegalMoves {
                   true,
                   targetEnPIndex
                 );
-                this.addMove(newMove);
+                this.addMoveTo(newMove, newMoves);
               }
             }
           }
@@ -456,7 +503,7 @@ class LegalMoves {
     }
   }
 
-  generateSlidingMoves(startIndex, piece, color) {
+  generateSlidingMoves(newMoves, startIndex, piece, color) {
     const pieceOnly = piece & Piece.PIECES_MASK;
     const pieceColor = piece & Piece.COLOR_MASK;
     const oppositeColor = color ^ Piece.COLOR_MASK;
@@ -475,20 +522,22 @@ class LegalMoves {
           const targetIndex =
             startIndex + directionOffsets[directionIndex] * (Math.abs(n) + 1);
           if (0 <= targetIndex && targetIndex < 64) {
-            const pieceOnTargetIndex = this.boardData.squares[targetIndex];
+            const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
             const pieceOnTargetIndexColor =
               pieceOnTargetIndex & Piece.COLOR_MASK;
             if (pieceOnTargetIndexColor === color) {
               break;
             }
             if (pieceOnTargetIndexColor === oppositeColor) {
-              this.addMove(
-                new Move(this.boardData, startIndex, targetIndex, true)
+              this.addMoveTo(
+                new Move(this.boardData, startIndex, targetIndex, true),
+                newMoves
               );
               break;
             } else {
-              this.addMove(
-                new Move(this.boardData, startIndex, targetIndex, false)
+              this.addMoveTo(
+                new Move(this.boardData, startIndex, targetIndex, false),
+                newMoves
               );
             }
           } else {
@@ -516,10 +565,24 @@ class LegalMoves {
 
   // checkout: http://127.0.0.1:5500/#r3k3/1p3p2/p2q2p1/bn3P2/1N2PQP1/PB6/3K1R1r/3R4%20w%20KQkq%20-%200%201
 
-  limitPinnedPieces() {
+  limitingMovementPinnedPieces() {
     // current legal moves: check for all moves if opponent offers new attacks to king if piece would move away
-    for (const move of this.moves) {
-      this.board
+    const movesOfNotKing = this.moves.filter((x) => x.pieceOnly != Piece.KING);
+    this.checkAttackOnPinnedPieces = []
+    for (const move of movesOfNotKing) {
+      this.boardData.setPieceInternal(move.from, 0);
+      const oldTargetPiece = this.boardData.setPieceInternal(
+        move.to,
+        move.piece
+      );
+      let newMoves = this.boardData.opponentLegalMoves.generateMoves();
+      newMoves = newMoves.filter((x) => x.isHit && x.targetPieceOnly === Piece.KING);
+      this.boardData.setPieceInternal(move.from, move.piece);
+      this.boardData.setPieceInternal(move.to, oldTargetPiece);
+      if (newMoves.length > 0) {
+        this.checkAttackOnPinnedPieces.push(...newMoves.flatMap(x => x.getIndexes()))
+        this.moves = this.moves.filter(x => !x.eq(move))
+      }
     }
   }
 

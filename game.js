@@ -33,11 +33,11 @@ class Game {
       this.color === Piece.WHITE
         ? "WHITE's turn" +
           (this.computerWhite.isOn()
-            ? "(AI)"// (" + this.computerWhite.name + ")"
+            ? "(AI)" // (" + this.computerWhite.name + ")"
             : "")
         : "BLACK's turn" +
           (this.computerBlack.isOn()
-            ? " (AI)"// (" + this.computerBlack.name + ")"
+            ? " (AI)" // (" + this.computerBlack.name + ")"
             : "");
     if (this.board.check) {
       turnText += " CHECK";
@@ -72,7 +72,7 @@ class Game {
   }
 
   makeMove(move, depth) {
-    this.board.makeMove(move);
+    this.board.makeMove(move, true);
     this.changeTurn();
     this.board.data.setLegalMovesFor(this.color);
     const fen = this.board.data.calculatedFen();
@@ -84,7 +84,16 @@ class Game {
     this.computerMove(undefined, depth + 1);
   }
 
+  setTimeLastMove(startTime) {
+    const endTime = performance.now();
+    const timeLastMove = window.document.getElementById("timeLastMove");
+    if (timeLastMove) {
+      timeLastMove.innerHTML = `${Math.floor((endTime - startTime)*10)/10} ms`
+    }
+  }
+
   clicked(clientY, clientX) {
+    const startTime = performance.now();
     const selectedIndex = this.board.data.selectedIndex;
     if (selectedIndex >= 0) {
       const clickedCell = this.board.clickedCell(clientY, clientX);
@@ -115,6 +124,7 @@ class Game {
         }
       }
     }
+    this.setTimeLastMove(startTime)
     return false;
   }
 

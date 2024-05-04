@@ -42,6 +42,15 @@ const PieceShortNamesLower = {
   6: "q", // Queen
 };
 
+function toFenChar(piece) {
+  if (piece === 0) return "";
+  let fenChar = PieceShortNamesLower[piece & Piece.PIECES_MASK];
+  if ((piece & Piece.COLOR_MASK) === Piece.WHITE) {
+    fenChar = fenChar.toUpperCase();
+  }
+  return fenChar;
+}
+
 const CastlingPositionsWhite = [56, 63];
 const CastlingPositionsBlack = [0, 7];
 

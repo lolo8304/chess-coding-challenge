@@ -1,20 +1,85 @@
 class BoardData {
   constructor(history, fen) {
+    this.check = false;
     this.debuggingIndexes = [];
     this.history = history;
     this.squares = new Array(64).fill(0);
+    this.piecesCache = {};
     this.selectedIndex = NOT_SELECTED;
-    this.selectCellIndex(NOT_SELECTED);
-    this.enPassantMove = [];
+    this.enPassantMove = undefined;
     this.halfMoveCounter = 0;
     this.nextFullMoveCounter = 1;
     this.resetHalfMoveCounter();
+    this.legalMoves = undefined;
+    this.opponentLegalMoves = undefined;
+    this.legalMovesForSelectedIndex = [];
     this.resetSquares(fen);
     this.result = undefined;
   }
 
   selectCellIndex(index) {
     this.selectedIndex = index;
+  }
+
+  getPiece(index) {
+    return this.squares[index];
+  }
+
+  setPiece(index, piece) {
+    console.log(
+      "SET " +
+        index +
+        " = " +
+        piece +
+        " (" +
+        PieceNames[piece & Piece.COLOR_MASK] +
+        " " +
+        PieceNames[piece & Piece.PIECES_MASK] +
+        " " +
+        toFenChar(piece) +
+        ")"
+    );
+    return this.setPieceInternal(index, piece);
+  }
+  
+  setPieceInternal(index, piece) {
+    const oldPiece = this.getPiece(index);
+    this.squares[index] = piece;
+    this.updatePiecesCache(index, oldPiece, piece);
+    return oldPiece;
+  }
+
+  getPiecesCacheByColor(color) {
+    return Object.keys(this.piecesCache)
+      .filter((key) => (parseInt(key) & color) > 0)
+      .map((key) => {
+        return { piece: parseInt(key), indexes: this.piecesCache[key] };
+      });
+  }
+
+  getPiecesCache(piece) {
+    return piece > 0 ? this.piecesCache[`${piece}`] : undefined;
+  }
+
+  updatePiecesCache(index, oldPiece, piece) {
+    if (oldPiece > 0) {
+      let indexesPerPiece = this.piecesCache[oldPiece];
+      if (indexesPerPiece === undefined) {
+        this.piecesCache[oldPiece] = [];
+      } else {
+        this.piecesCache[oldPiece] = indexesPerPiece.filter(
+          (item) => item !== index
+        );
+      }
+    }
+    if (piece > 0) {
+      let indexesPerPiece = this.piecesCache[piece];
+      if (indexesPerPiece === undefined) {
+        this.piecesCache[piece] = [index];
+      } else {
+        this.piecesCache[piece].push(index);
+      }
+    }
   }
 
   // rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e6 0 1
@@ -94,15 +159,14 @@ class BoardData {
       } else {
         const pieceColor = symbol >= 97 ? Piece.BLACK : Piece.WHITE;
         const pieceType = FEN_Pieces[String.fromCharCode(symbol).toLowerCase()];
-        this.squares[yIndex * ROW_CELLS + xIndex] = pieceType | pieceColor;
+        this.setPiece(yIndex * ROW_CELLS + xIndex, pieceType | pieceColor);
         xIndex++;
       }
     }
-    this.legalMoves = new LegalMoves(startColor, this, this.history);
+    this.legalMoves = new LegalMoves(startColor, this);
     this.opponentLegalMoves = new LegalMoves(
       startColor ^ Piece.COLOR_MASK,
-      this,
-      this.history
+      this
     );
   }
 
@@ -111,7 +175,7 @@ class BoardData {
     let emptyCount = 0;
 
     for (let i = 0; i < 64; i++) {
-      const piece = this.squares[i];
+      const piece = this.getPiece(i);
       const pieceOnly = piece & Piece.PIECES_MASK;
       const color = piece & Piece.COLOR_MASK;
 
@@ -161,8 +225,9 @@ class BoardData {
       castlingString = "-";
     }
 
-    let enPassantString = this.enPassantMove
-      ? this.indexToAlgebraic(this.enPassantMove.enPassantTarget)
+    const lastMove = this.history.lastMove();
+    let enPassantString = lastMove
+      ? this.indexToAlgebraic(lastMove.enPassantTarget)
       : "-";
 
     // Example: , no en passant, and default half/full move counters.
@@ -186,10 +251,10 @@ class BoardData {
     const opponentColor = color ^ Piece.COLOR_MASK;
     this.debuggingIndexes = [];
     const oldLegalMoves = this.legalMoves;
-    const newLegalMoves = this.legalMovesFor(color);
+    const newLegalMoves = this.newLegalMovesFor(color);
     if (oldLegalMoves.color != color || !newLegalMoves.eq(oldLegalMoves)) {
       this.legalMoves = newLegalMoves;
-      this.opponentLegalMoves = this.legalMovesFor(opponentColor);
+      this.opponentLegalMoves = this.newLegalMovesFor(opponentColor);
       console.log("Moves " + PieceNames[color]);
       console.table(this.legalMoves.moves);
       console.log("Moves " + PieceNames[opponentColor]);
@@ -213,7 +278,7 @@ class BoardData {
       this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
         this.selectedIndex
       );
-      const selectedPiece = this.squares[this.selectedIndex];
+      const selectedPiece = this.getPiece(this.selectedIndex);
       const selectedPieceOnly = selectedPiece & Piece.PIECES_MASK;
       if (selectedPieceOnly === Piece.KING) {
         this.legalMovesForSelectedIndex =
@@ -224,11 +289,13 @@ class BoardData {
     } else {
       this.legalMovesForSelectedIndex = [];
     }
-    this.legalMoves.limitPinnedPieces();
+    this.legalMoves.limitingMovementPinnedPieces();
   }
 
-  legalMovesFor(color) {
-    return new LegalMoves(color, this, this.history).generateMoves(color);
+  newLegalMovesFor(color) {
+    const newLegalMove = new LegalMoves(color, this);
+    newLegalMove.moves = newLegalMove.generateMoves(color);
+    return newLegalMove;
   }
 
   indexToGrid(index) {
@@ -252,14 +319,13 @@ class BoardData {
   }
 
   indexesOfPiece(piece) {
-    const pieceOnly = piece & Piece.PIECES_MASK;
-    return this.squares.filter((x) => (x & Piece.PIECES_MASK) === pieceOnly);
+    if (piece === 0) return [];
+    return this.getPiecesCache(piece);
   }
   anyOfPiece(piece) {
-    for (let i = 0; i < this.squares.length; i++) {
-      if (this.squares[i] === piece) return i;
-    }
-    return undefined;
+    if (piece === 0) return undefined;
+    const currentIndexes = this.getPiecesCache(piece);
+    return currentIndexes.length > 0 ? currentIndexes[0] : undefined;
   }
 
   debugIndexColor(index) {
@@ -279,7 +345,6 @@ class BoardData {
   }
 
   debugIndexColorTarget(index) {
-    //if (this.enPassantMove.includes(index)) return "green";
     const found = this.debuggingIndexes.find((x) => x.to === index);
     if (!found) return undefined;
     if (found.to === index) return "red";
@@ -287,7 +352,12 @@ class BoardData {
   }
 
   isLegalEnPassant(targetEnPassant) {
-    return this.enPassantMove && this.enPassantMove.to === targetEnPassant;
+    const lastMove = this.history.lastMove();
+    return (
+      lastMove &&
+      lastMove.isEnPassantAttackable() &&
+      lastMove.to === targetEnPassant
+    );
   }
 
   getKingPosition(color) {
@@ -308,5 +378,46 @@ class BoardData {
   }
   isNotFinished() {
     return this.result === undefined;
+  }
+
+  undoMove(move) {
+    const lastMove = this.history.undoLastMove();
+    if (!lastMove) {
+      throw Error(
+        "Cannot undo move: " + move + " because these is no move to undo"
+      );
+    }
+    if (!lastMove.eq(move)) {
+      throw Error(
+        "Cannot undo move: " +
+          move +
+          " because last move is not the same " +
+          lastMove
+      );
+    }
+  }
+
+  makeMove(move, withHalfMoves) {
+    this.history.storeMove(move);
+    move.makeMove();
+    this.selectCellIndex(NOT_SELECTED);
+    if (withHalfMoves) {
+      if (move.pieceOnly === Piece.PAWN || move.isHit) {
+        this.resetHalfMoveCounter();
+      } else {
+        this.incHalfMoveCounter();
+      }
+      if (this.halfMoveCounter === 100) {
+        const confirmed = window.confirm(
+          "50 move rule - confirm to offer DRAW?"
+        );
+        if (confirmed) {
+          this.result = "DRAW - agreed by 50-move rule ";
+        }
+      }
+      if (this.halfMoveCounter === 150) {
+        this.result = "DRAW - forced by 75-move rule";
+      }
+    }
   }
 }

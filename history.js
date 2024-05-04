@@ -10,6 +10,9 @@ class History {
   storeMove(move) {
     this.movesHistory.push(move);
   }
+  undoLastMove() {
+    return this.movesHistory.pop()
+  }
   hasMoved(piece) {
     return this.movesHistory.find((x) => x.piece === piece) != undefined;
   }
