@@ -110,8 +110,7 @@ class Board {
       this.data.legalMoves.checkAttackOnPinnedPieces.includes(index);
     if (
       (this.data.isNotFinished() && checkMoves.length > 0) ||
-      isInCheckAttack ||
-      isInCheckAttackInPinnedPieces
+      isInCheckAttack //|| isInCheckAttackInPinnedPieces
     ) {
       fill("rgba(255, 255, 0, 0.4)");
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
