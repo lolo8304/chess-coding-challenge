@@ -103,7 +103,8 @@ function undoLastMove() {
 }
 
 function testMoves() {
-  const maxDepth = 3;
+  console.log("Start test move calculation:");
+  maxDepth = 2;
   for (let depth = 1; depth < maxDepth + 1; depth++) {
     const startTime = performance.now();
     const numPositions = game.board.data.testMoves(depth);

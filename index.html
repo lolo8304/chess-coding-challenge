@@ -78,17 +78,31 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupFen();
         });
+        function testMovesStart() {
+          if (window.location.hostname === "localhost") {
+            const testMovesElement = document.getElementById('testMovesElem');
+            testMovesElement.setAttribute("style", "display:none");
+            setTimeout(function test() { 
+              testMoves()
+              testMovesElement.setAttribute("style", "display:")
+            }, 100);
+          }
+        }
         function setupFen() {
-            fen = window.location.hash
-            if (!fen) {
-              fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-            } else {
-              fen = fen.replace(/%20/g, ' ').substring(1)
-            }
-            fenUI = window.document.getElementById("fen")
-            if (fenUI) {
-              fenUI.value = fen
-            }
+          if (window.location.hostname === "localhost") {
+            const testMovesElement = document.getElementById('testMovesElem');
+            testMovesElement.setAttribute("style", "display:")
+          }
+          fen = window.location.hash
+          if (!fen) {
+            fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+          } else {
+            fen = fen.replace(/%20/g, ' ').substring(1)
+          }
+          fenUI = window.document.getElementById("fen")
+          if (fenUI) {
+            fenUI.value = fen
+          }
         }
     </script>
   </head>
@@ -98,10 +112,10 @@
     <div>
         <form onsubmit="handleSubmit(event)">
           <input id="fen" class="full-width-input" value="" id="fen" />
-          <button onclick="window.location.href='/'; return false" type="submit">New</button>
+          <button onclick="window.location.href='/'; return false" type="button">New</button>
           <button type="submit">start with FEN</button>
           <button onclick="undoLastMove(); return false" type="button">Undo</button>
-          <button onclick="testMoves(); return false" type="button">Test moves</button>
+          <button style="display:none" id="testMovesElem" onclick="testMovesStart(); return false" type="button">Test moves</button>
           <a href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
           &nbsp;&nbsp;&nbsp;Time last move: <span id="timeLastMove"></span>
         </form>
