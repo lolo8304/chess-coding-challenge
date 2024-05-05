@@ -276,19 +276,12 @@ class BoardData {
       this.check = true;
       this.legalMoves.removePseudoIllegalMoves(movesToCheckFromMe);
     }
+    this.legalMoves.removePseudoIllegalMovesForMyKing(color);
 
     if (this.selectedIndex != NOT_SELECTED) {
       this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
         this.selectedIndex
       );
-      const selectedPiece = this.getPiece(this.selectedIndex);
-      const selectedPieceOnly = selectedPiece & Piece.PIECES_MASK;
-      if (selectedPieceOnly === Piece.KING) {
-        this.legalMovesForSelectedIndex =
-          this.legalMoves.removePseudoIllegalMovesSelectedKing(
-            this.legalMovesForSelectedIndex
-          );
-      }
     } else {
       this.legalMovesForSelectedIndex = [];
     }
@@ -334,7 +327,9 @@ class BoardData {
   anyOfPiece(piece) {
     if (piece === 0) return undefined;
     const currentIndexes = this.getPiecesCache(piece);
-    return currentIndexes.length > 0 ? currentIndexes[0] : undefined;
+    return currentIndexes && currentIndexes.length > 0
+      ? currentIndexes[0]
+      : undefined;
   }
 
   debugIndexColor(index) {
@@ -405,6 +400,9 @@ class BoardData {
       );
     }
     lastMove.undoLastMove();
+    this.check = false;
+    this.checkMate = false;
+    this.result = undefined;
   }
 
   makeMove(move, withHalfMoves) {
@@ -444,38 +442,84 @@ class BoardData {
   }
 }
 
+class MoveGeneratorStats {
+  constructor(
+    nodes,
+    captures,
+    ep,
+    castles,
+    promotions,
+    checks,
+    discoveryChecks,
+    doubleChecks,
+    checkmates
+  ) {
+    this.nodes = nodes || 0;
+    this.captures = captures || 0;
+    this.ep = ep || 0;
+    this.castles = castles || 0;
+    this.promotions = promotions || 0;
+    this.checks = checks || 0;
+    this.discoveryChecks = discoveryChecks || 0;
+    this.doubleChecks = doubleChecks || 0;
+    this.checkmates = checkmates || 0;
+  }
+  add(stat) {
+    this.nodes += stat.nodes;
+    this.captures += stat.captures;
+    this.ep += stat.ep;
+    this.castles += stat.castles;
+    this.promotions += stat.promotions;
+    this.checks += stat.checks;
+    this.discoveryChecks += stat.discoveryChecks;
+    this.doubleChecks += stat.doubleChecks;
+    this.checkmates += stat.checkmates;
+  }
+  toString() {
+    return "Nodes=" + this.nodes + ", hits="+this.captures+", ep="+this.ep+", castles="+this.castles+", prom="+this.promotions+", checks="+this.checks;
+  }
+}
+
 class MoveGeneratorTest {
   constructor(data, color, maxDepth) {
     this.data = data;
     this.color = color;
-    this.maxDepth = maxDepth
+    this.maxDepth = maxDepth;
   }
-  testMoves(depth) {
+  testMoves(depth, move) {
     if (depth === 0) {
-      return 1;
+      return new MoveGeneratorStats(
+        1,
+        move.isHit ? 1 : 0,
+        move.enPassant ? 1 : 0,
+        move.castlingKingTargetIndex ? 1 : 0,
+        move.promotionPiece ? 1 : 0,
+        move.isCheck ? 1 : 0,
+        0,
+        0,
+        0
+      );
     }
     const moves = [...this.data.legalMoves.moves];
-    let numPositions = 0;
+    let numPositions = new MoveGeneratorStats();
     //depth > 0 && console.log("  ".repeat(depth) + depth + " Test for " + moves.length + " moves");
     for (const move of moves) {
       this.data.makeMove(move, false);
       const newColor = this.color ^ Piece.COLOR_MASK;
       this.data.setLegalMovesFor(newColor);
       game.color = newColor;
-      //redraw();
+      redraw();
 
-      const inc = this.testMoves(
-        depth - 1
-      );
-      numPositions += inc;
-      (depth === this.maxDepth) &&
-        console.log(
-          move.toCoordinateNotation() + ": " + (inc)
-        );
+      const inc = this.testMoves(depth - 1, move);
+      numPositions.add(inc);
+
+      depth === this.maxDepth &&
+        console.log(move.toCoordinateNotation() + ": " + inc);
+
       this.data.undoMove(move);
       this.data.setLegalMovesFor(this.color);
       game.color = this.color;
-      //redraw();
+      redraw();
     }
     return numPositions;
   }

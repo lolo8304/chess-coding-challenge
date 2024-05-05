@@ -327,6 +327,22 @@ class LegalMoves {
     return { long: !rookLongMoved, short: !rookShortMoved };
   }
 
+  myLegalMoves(color) {
+    if (this.boardData.legalMoves.color === color) {
+      return this.boardData.legalMoves;
+    } else {
+      return this.boardData.opponentLegalMoves;
+    }
+  }
+
+  myOpponentLegalMoves(color) {
+    if (this.boardData.legalMoves.color !== color) {
+      return this.boardData.legalMoves;
+    } else {
+      return this.boardData.opponentLegalMoves;
+    }
+  }
+
   generateCastlingKings(newMoves, startIndex, piece, color) {
     if (this.boardData.history.hasMoved(piece)) return;
     const rookPositions =
@@ -347,7 +363,7 @@ class LegalMoves {
         }
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (targetIndex <= index && index < startIndex) {
-          if (this.boardData.opponentLegalMoves.hasAnyMoveToIndex(index)) {
+          if (this.myOpponentLegalMoves(color).hasAnyMoveToIndex(index)) {
             verbose &&
               console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
@@ -357,7 +373,7 @@ class LegalMoves {
       }
       if (
         isEmpty &&
-        this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)
+        this.myOpponentLegalMoves(color).hasAnyMoveToIndex(startIndex)
       ) {
         isEmpty = false;
         verbose &&
@@ -394,7 +410,7 @@ class LegalMoves {
         }
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (startIndex < index && index <= targetIndex) {
-          if (this.boardData.opponentLegalMoves.hasAnyMoveToIndex(index)) {
+          if (this.myOpponentLegalMoves(color).hasAnyMoveToIndex(index)) {
             verbose &&
               console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
@@ -404,7 +420,7 @@ class LegalMoves {
       }
       if (
         isEmpty &&
-        this.boardData.opponentLegalMoves.hasAnyMoveToIndex(startIndex)
+        this.myOpponentLegalMoves(color).hasAnyMoveToIndex(startIndex)
       ) {
         isEmpty = false;
         verbose &&
@@ -673,18 +689,36 @@ class LegalMoves {
     }
   }
 
-  removePseudoIllegalMovesSelectedKing(legalMovesForSelectedIndex) {
-    const movesToKeep = [];
-    for (const moveOfKing of legalMovesForSelectedIndex) {
-      // check if any opponent move target at the legal move target
-      let hasAnyCheck = this.boardData.opponentLegalMoves.hasAnyMoveToIndex(
+  removePseudoIllegalMovesForMyKing(color) {
+    const legalMovesForKing = this.getMovesFrom(
+      this.boardData.getKingPosition(color)
+    );
+    for (const moveOfKing of legalMovesForKing) {
+      moveOfKing.makeMove();
+      const opponentColor = color ^ Piece.COLOR_MASK;
+      const newMoves =
+        this.myOpponentLegalMoves(color).generateMoves(opponentColor);
+      moveOfKing.undoLastMove();
+      if (
+        newMoves.find(
+          (x) =>
+            x.to === moveOfKing.to &&
+            x.isHit &&
+            x.targetPieceOnly === Piece.KING
+        )
+      ) {
+        this.moves = this.moves.filter((x) => !x.eqFromTo(moveOfKing));
+      }
+      // old algo: not covering new moves for check - check if any opponent move target at the legal move target
+      /*
+      let hasAnyCheck = this.myOpponentLegalMoves(color).hasAnyMoveToIndex(
         moveOfKing.to
       );
-      if (!hasAnyCheck) {
-        movesToKeep.push(moveOfKing);
+      if (hasAnyCheck) {
+        this.moves = this.moves.filter((x) => !x.eqFromTo(moveOfKing));
       }
+      */
     }
-    return movesToKeep;
   }
 
   // checkout: http://127.0.0.1:5500/#r3k3/1p3p2/p2q2p1/bn3P2/1N2PQP1/PB6/3K1R1r/3R4%20w%20KQkq%20-%200%201
@@ -714,6 +748,8 @@ class LegalMoves {
   }
 
   removePseudoIllegalMoves(movesToCheck) {
+    if (movesToCheck.length === 0) return;
+    const color = movesToCheck[0].color;
     this.checkAttackIndexes = [];
     for (const move of movesToCheck) {
       this.checkAttackIndexes.push(...move.getIndexes());
@@ -734,17 +770,15 @@ class LegalMoves {
       const kingsTargetInAttackLineNotAllowed =
         this.checkAttackIndexes.includes(moveOfKing.to);
       if (!kingsTargetInAttackLineNotAllowed) {
-        for (const opponentMove of this.boardData.opponentLegalMoves.moves) {
-          if (moveOfKing.to !== opponentMove.to) {
-            if (
-              movesToKeep.find(
-                (x) => x.from === moveOfKing.from && x.to === moveOfKing.to
-              ) === undefined
-            ) {
+        for (const opponentMove of this.myLegalMoves(color).moves) {
+          if (moveOfKing.to !== opponentMove.from) {
+            if (movesToKeep.find((x) => x.eqFromTo(moveOfKing)) === undefined) {
               movesToKeep.push(moveOfKing);
             }
           }
         }
+      } else if (moveOfKing.isHit) { // check 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -  move the king
+        movesToKeep.push(moveOfKing);
       }
     }
     // check if new opponent hits would check the king

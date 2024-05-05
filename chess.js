@@ -102,7 +102,7 @@ function undoLastMove() {
   game.undoLastMove();
 }
 
-function testMoves() {
+function testMoves(callbackStats) {
   console.log("Start test move calculation:");
   maxDepth = 2;
   for (let depth = 1; depth < maxDepth + 1; depth++) {
@@ -118,6 +118,7 @@ function testMoves() {
         diffTime +
         " ms"
     );
+    callbackStats(depth, numPositions)
   }
 }
 

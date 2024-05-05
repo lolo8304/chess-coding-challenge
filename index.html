@@ -78,12 +78,20 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupFen();
         });
+
+        function stats(depth, stat) {
+          setTimeout(function stats2() { 
+            const testMovesResults = document.getElementById('testMovesResults');
+            testMovesResults.innerHTML = testMovesResults.innerHTML + "<br>"+depth+": "+stat
+          }, 100);
+        }
+
         function testMovesStart() {
           if (window.location.hostname === "localhost") {
             const testMovesElement = document.getElementById('testMovesElem');
             testMovesElement.setAttribute("style", "display:none");
             setTimeout(function test() { 
-              testMoves()
+              testMoves(stats)
               testMovesElement.setAttribute("style", "display:")
             }, 100);
           }
@@ -148,5 +156,6 @@
           </fieldset>
       </form>
       </div>
+      <div id="testMovesResults"></div>
   </body>
 </html>
