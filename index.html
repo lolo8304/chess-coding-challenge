@@ -116,10 +116,10 @@
           <input id="fen" class="full-width-input" value="" id="fen" />
           <button onclick="window.location.href='/'; return false" type="button">New</button>
           <button type="submit">FEN</button>
-          <button onclick="undoLastMove(); return false" type="button">Undo</button>
           <button style="display:none" id="testMovesElem" onclick="testMovesStart(); return false" type="button">Test moves</button>
           <a id="fenLibrary" style="display:none" href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
           &nbsp;Time: <span id="timeLastMove"></span>
+          <button onclick="undoLastMove(); return false" type="button">Undo</button>
         </form>
 
         <form id="computerForm" style="display: flex;padding:10px;">
