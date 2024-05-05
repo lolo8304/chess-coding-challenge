@@ -110,11 +110,19 @@ class Board {
       this.data.legalMoves.checkAttackOnPinnedPieces.includes(index);
     if (
       (this.data.isNotFinished() && checkMoves.length > 0) ||
-      isInCheckAttack //|| isInCheckAttackInPinnedPieces
+      isInCheckAttack 
     ) {
       fill("rgba(255, 255, 0, 0.4)");
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
+    if (
+      (this.data.isNotFinished() && checkMoves.length > 0) ||
+       isInCheckAttackInPinnedPieces
+    ) {
+      fill("rgba(255, 140, 0, 0.4)");
+      rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
+    }
+    
 
     const size = Math.floor(CELL_SIZE / 4);
     textSize(size);
