@@ -53,6 +53,10 @@ class Move {
       other?.isHit === this.isHit
     );
   }
+  eqFromTo(other) {
+    return other?.from === this.from && other?.to === this.to;
+  }
+
   isEnPassantAttackable() {
     return (
       (this.piece & Piece.PIECES_MASK) === Piece.PAWN &&
@@ -79,15 +83,15 @@ class Move {
       gridX: gridFrom.gridX,
     };
     const indexes = [];
-    let counter = 0
+    let counter = 0;
     while (newGrid.gridY != gridTo.gridY || newGrid.gridX != gridTo.gridX) {
       const index = newGrid.gridY * ROW_CELLS + newGrid.gridX;
       indexes.push(index);
       newGrid.gridY += sign.gridY;
       newGrid.gridX += sign.gridX;
-      counter++
+      counter++;
       if (counter > 8) {
-        throw Error ("Looping ")
+        throw Error("Looping ");
       }
     }
     const index = newGrid.gridY * ROW_CELLS + newGrid.gridX;
@@ -151,6 +155,10 @@ class Move {
       );
       this.setPiece(this.castlingRookStartIndex, Piece.None);
     }
+  }
+
+  isPartOf(listOfMoves) {
+    return listOfMoves.find((x) => x.eqFromTo(this)) !== undefined;
   }
 }
 
@@ -618,6 +626,7 @@ class LegalMoves {
     // current legal moves: check for all moves if opponent offers new attacks to king if piece would move away
     const movesOfNotKing = this.moves.filter((x) => x.pieceOnly != Piece.KING);
     this.checkAttackOnPinnedPieces = [];
+    const movesToRemove = [];
     for (const move of movesOfNotKing) {
       this.boardData.setPieceInternal(move.from, 0);
       const oldTargetPiece = this.boardData.setPieceInternal(
@@ -634,8 +643,11 @@ class LegalMoves {
         this.checkAttackOnPinnedPieces.push(
           ...newMoves.flatMap((x) => x.getIndexes())
         );
-        this.moves = this.moves.filter((x) => !x.eq(move));
+        movesToRemove.push(move);
       }
+    }
+    if (movesToRemove) {
+      this.moves = this.moves.filter((x) => !x.isPartOf(movesToRemove));
     }
   }
 
@@ -652,7 +664,7 @@ class LegalMoves {
       }
     }
     const movesOfTheKing = this.getMovesOfMyKing();
-    verbose >=2 && console.table(movesToKeep);
+    verbose >= 2 && console.table(movesToKeep);
 
     // check which are moves that are in attack by opponent
     // opponent.to == movesOfTheKing.to
