@@ -27,19 +27,20 @@ class BoardData {
   }
 
   setPiece(index, piece) {
-    verbose && console.log(
-      "SET " +
-        index +
-        " = " +
-        piece +
-        " (" +
-        PieceNames[piece & Piece.COLOR_MASK] +
-        " " +
-        PieceNames[piece & Piece.PIECES_MASK] +
-        " " +
-        toFenChar(piece) +
-        ")"
-    );
+    verbose &&
+      console.log(
+        "SET " +
+          index +
+          " = " +
+          piece +
+          " (" +
+          PieceNames[piece & Piece.COLOR_MASK] +
+          " " +
+          PieceNames[piece & Piece.PIECES_MASK] +
+          " " +
+          toFenChar(piece) +
+          ")"
+      );
     return this.setPieceInternal(index, piece);
   }
 
@@ -227,9 +228,10 @@ class BoardData {
     }
 
     const lastMove = this.history.lastMove();
-    let enPassantString = lastMove
-      ? this.indexToAlgebraic(lastMove.enPassantTarget)
-      : "-";
+    let enPassantString =
+      lastMove && lastMove.enPassantTarget
+        ? this.indexToAlgebraic(lastMove.enPassantTarget)
+        : "-";
 
     // Example: , no en passant, and default half/full move counters.
     const finalFenString =

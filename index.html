@@ -100,6 +100,7 @@
           <input id="fen" class="full-width-input" value="" id="fen" />
           <button onclick="window.location.href='/'; return false" type="submit">New</button>
           <button type="submit">start with FEN</button>
+          <button onclick="undoLastMove(); return false" type="button">Undo</button>
           <a href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
           &nbsp;&nbsp;&nbsp;Time last move: <span id="timeLastMove"></span>
         </form>

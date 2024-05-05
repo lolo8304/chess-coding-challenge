@@ -1,3 +1,12 @@
+class UndoMove {
+  constructor() {
+    this.undoPiecesAtIndex = [];
+  }
+  addUndoPiece(index, piece) {
+    this.undoPiecesAtIndex.push({ index, piece });
+  }
+}
+
 class Move {
   constructor(
     board,
@@ -22,6 +31,7 @@ class Move {
     this.castlingKingTargetIndex = castlingKingTargetIndex; // castling king - king position
     this.castlingRookStartIndex = castlingRookStartIndex; // castling king - rook position start
     this.castlingRookTargetIndex = castlingRookTargetIndex; // castling king - rook position target
+    this.undoMove = undefined;
   }
   calculateFromAndTo(from, to) {
     this.from = from;
@@ -110,18 +120,34 @@ class Move {
     return targetSquare;
   }
 
+  setPiece(index, piece) {
+    const oldPiece = this.board.setPiece(index, piece);
+    if (oldPiece > 0) {
+      this.undoMove.addUndoPiece(index, oldPiece);
+    }
+  }
+
+  undoLastMove() {
+    if (this.undoMove) {
+      for (const indexAndPiece of this.undoMove.undoPiecesAtIndex) {
+        this.board.setPieceInternal(indexAndPiece.index, indexAndPiece.piece);
+      }
+    }
+  }
+
   makeMove() {
-    this.board.setPiece(this.to, this.board.getPiece(this.from));
-    this.board.setPiece(this.from, Piece.None);
+    this.undoMove = new UndoMove();
+    this.setPiece(this.to, this.board.getPiece(this.from));
+    this.setPiece(this.from, Piece.None);
     if (this.enPassant) {
-      this.board.setPiece(this.enPassant, Piece.None);
+      this.setPiece(this.enPassant, Piece.None);
     }
     if (this.castlingKingTargetIndex) {
-      this.board.setPiece(
+      this.setPiece(
         this.castlingRookTargetIndex,
         this.board.getPiece(this.castlingRookStartIndex)
       );
-      this.board.setPiece(this.castlingRookStartIndex, Piece.None);
+      this.setPiece(this.castlingRookStartIndex, Piece.None);
     }
   }
 }

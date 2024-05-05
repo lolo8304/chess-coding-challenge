@@ -98,6 +98,10 @@ function clickedInCanvas(event) {
   return game.clicked(event.clientY, event.clientX);
 }
 
+function undoLastMove() {
+  game.undoLastMove()
+}
+
 function getElementByValue(tag, value) {
   const elems = [].filter.call(
     document.getElementsByTagName(tag),

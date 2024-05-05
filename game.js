@@ -47,11 +47,15 @@ class Game {
       fill("red");
       rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
     }
-    const fontSize = this.w > 600 ? 40 : (this.w > 400 ? 30 : 20);
+    const fontSize = this.w > 600 ? 40 : this.w > 400 ? 30 : 20;
     textSize(fontSize);
     fill("white");
     textAlign(CENTER);
-    text(turnText, this.x + this.w / 2, this.y - this.paddingTop + this.paddingTop / 2 + (fontSize-10) / 2);
+    text(
+      turnText,
+      this.x + this.w / 2,
+      this.y - this.paddingTop + this.paddingTop / 2 + (fontSize - 10) / 2
+    );
     if (this.time > 1.0) {
       const movedBlack = this.computerMoveNow(this.computerBlack, 0);
       const movedWhite = this.computerMoveNow(this.computerWhite, 0);
@@ -68,8 +72,14 @@ class Game {
     this.time += this.velocity;
   }
 
-  makeMove(move, depth) {
-    this.board.makeMove(move, true);
+  undoLastMove() {
+    const lastMove = this.board.undoLastMove();
+    if (lastMove) {
+      this.makeTurnAndCalculate(0);
+    }
+  }
+
+  makeTurnAndCalculate(depth) {
     this.changeTurn();
     this.board.data.setLegalMovesFor(this.color);
     const fen = this.board.data.calculatedFen();
@@ -81,11 +91,18 @@ class Game {
     this.computerMove(undefined, depth + 1);
   }
 
+  makeMove(move, depth) {
+    this.board.makeMove(move, true);
+    this.makeTurnAndCalculate(depth);
+  }
+
   setTimeLastMove(startTime) {
     const endTime = performance.now();
     const timeLastMove = window.document.getElementById("timeLastMove");
     if (timeLastMove) {
-      timeLastMove.innerHTML = `${Math.floor((endTime - startTime)*10)/10} ms`
+      timeLastMove.innerHTML = `${
+        Math.floor((endTime - startTime) * 10) / 10
+      } ms`;
     }
   }
 
@@ -121,7 +138,7 @@ class Game {
         }
       }
     }
-    this.setTimeLastMove(startTime)
+    this.setTimeLastMove(startTime);
     return false;
   }
 
