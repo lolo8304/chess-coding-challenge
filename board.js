@@ -239,7 +239,7 @@ class Board {
   }
 
   undoLastMove() {
-    var lastMove = this.data.history.undoLastMove();
+    var lastMove = this.data.history.lastMoveToUndo();
     if (lastMove) {
       this.data.undoMove(lastMove);
     }
