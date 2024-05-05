@@ -265,9 +265,6 @@ class BoardData {
         console.table(this.opponentLegalMoves.moves);
       }
     }
-    //for (const move of this.opponentLegalMoves.moves) {
-    //  this.debuggingIndexes.push(move);
-    //}
     this.legalMoves.limitingMovementPinnedPieces();
     const movesToCheckForMe = this.getMovesAsIamUnderCheck();
     if (movesToCheckForMe.length > 0) {
@@ -299,6 +296,9 @@ class BoardData {
       this.checkMate = true;
       this.result = "CHECK MATE: " + PieceNames[this.opponentLegalMoves.color];
     }
+    //for (const move of this.opponentLegalMoves.moves) {
+    //  this.debuggingIndexes.push(move);
+    //}
   }
 
   newLegalMovesFor(color) {

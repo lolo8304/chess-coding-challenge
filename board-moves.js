@@ -138,6 +138,7 @@ class Move {
       for (const indexAndPiece of this.undoMove.undoPiecesAtIndex) {
         this.board.setPieceInternal(indexAndPiece.index, indexAndPiece.piece);
       }
+      this.undoMove = undefined;
     }
   }
 
@@ -628,17 +629,12 @@ class LegalMoves {
     this.checkAttackOnPinnedPieces = [];
     const movesToRemove = [];
     for (const move of movesOfNotKing) {
-      this.boardData.setPieceInternal(move.from, 0);
-      const oldTargetPiece = this.boardData.setPieceInternal(
-        move.to,
-        move.piece
-      );
+      move.makeMove();
       let newMoves = this.boardData.opponentLegalMoves.generateMoves();
       newMoves = newMoves.filter(
         (x) => x.isHit && x.targetPieceOnly === Piece.KING
       );
-      this.boardData.setPieceInternal(move.from, move.piece);
-      this.boardData.setPieceInternal(move.to, oldTargetPiece);
+      move.undoLastMove();
       if (newMoves.length > 0) {
         this.checkAttackOnPinnedPieces.push(
           ...newMoves.flatMap((x) => x.getIndexes())
