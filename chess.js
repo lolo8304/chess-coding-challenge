@@ -9,7 +9,7 @@ const ROW_CELLS = 8; // count
 const COL_CELLS_AND_BOUNDARY = COL_CELLS;
 const ROW_CELLS_AND_BOUNDARY = ROW_CELLS;
 
-const verbose = 1; // 1 - default log, 2 - moves logs
+let verbose = 1; // 1 - default log, 2 - moves logs
 
 let cnv;
 let startScreen;
@@ -99,7 +99,25 @@ function clickedInCanvas(event) {
 }
 
 function undoLastMove() {
-  game.undoLastMove()
+  game.undoLastMove();
+}
+
+function testMoves() {
+  const maxDepth = 3;
+  for (let depth = 1; depth < maxDepth + 1; depth++) {
+    const startTime = performance.now();
+    const numPositions = game.board.data.testMoves(depth);
+    const diffTime = Math.round(performance.now() - startTime);
+    console.log(
+      "Depth: " +
+        depth +
+        " ply Result: " +
+        numPositions +
+        " Time " +
+        diffTime +
+        " ms"
+    );
+  }
 }
 
 function getElementByValue(tag, value) {

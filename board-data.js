@@ -404,6 +404,7 @@ class BoardData {
           lastMove
       );
     }
+    lastMove.undoLastMove()
   }
 
   makeMove(move, withHalfMoves) {
@@ -428,5 +429,44 @@ class BoardData {
         this.result = "DRAW - forced by 75-move rule";
       }
     }
+  }
+
+  testMoves(maxDepth) {
+    const oldVerbose = verbose
+    verbose = 0
+    const numPositions = new MoveGeneratorTest(this, this.legalMoves.color).testMoves(maxDepth);
+    verbose = oldVerbose
+    return numPositions
+  }
+}
+
+class MoveGeneratorTest {
+  constructor(data, color) {
+    this.data = data;
+    this.color = color;
+  }
+  testMoves(depth) {
+    if (depth === 0) {
+      return 1;
+    }
+    const moves = [...this.data.legalMoves.moves];
+    let numPositions = 0;
+    depth > 1 && console.log(("  ".repeat(depth))+depth+" Test for "+moves.length+" moves")
+    for (const move of moves) {
+      this.data.makeMove(move, false);
+      const newColor = this.color ^ Piece.COLOR_MASK;
+      this.data.setLegalMovesFor(newColor);
+      game.color = newColor;
+      //redraw();
+
+      numPositions += new MoveGeneratorTest(this.data, newColor).testMoves(
+        depth - 1
+      );
+      this.data.undoMove(move);
+      this.data.setLegalMovesFor(this.color);
+      game.color = this.color;
+      //redraw();
+    }
+    return numPositions;
   }
 }

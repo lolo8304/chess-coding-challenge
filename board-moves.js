@@ -79,12 +79,16 @@ class Move {
       gridX: gridFrom.gridX,
     };
     const indexes = [];
+    let counter = 0
     while (newGrid.gridY != gridTo.gridY || newGrid.gridX != gridTo.gridX) {
       const index = newGrid.gridY * ROW_CELLS + newGrid.gridX;
       indexes.push(index);
       newGrid.gridY += sign.gridY;
       newGrid.gridX += sign.gridX;
-      console.log("run for index " + index);
+      counter++
+      if (counter > 8) {
+        throw Error ("Looping ")
+      }
     }
     const index = newGrid.gridY * ROW_CELLS + newGrid.gridX;
     indexes.push(index);
@@ -122,9 +126,7 @@ class Move {
 
   setPiece(index, piece) {
     const oldPiece = this.board.setPiece(index, piece);
-    if (oldPiece > 0) {
-      this.undoMove.addUndoPiece(index, oldPiece);
-    }
+    this.undoMove.addUndoPiece(index, oldPiece);
   }
 
   undoLastMove() {
@@ -650,7 +652,7 @@ class LegalMoves {
       }
     }
     const movesOfTheKing = this.getMovesOfMyKing();
-    console.table(movesToKeep);
+    verbose >=2 && console.table(movesToKeep);
 
     // check which are moves that are in attack by opponent
     // opponent.to == movesOfTheKing.to
@@ -697,7 +699,7 @@ class LegalMoves {
         movesToKeepWithoutCheck.push(moveOfKing);
       }
     }
-    console.table(movesToKeepWithoutCheck);
+    verbose >= 2 && console.table(movesToKeepWithoutCheck);
     this.moves = movesToKeepWithoutCheck;
   }
 }
