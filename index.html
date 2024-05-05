@@ -92,6 +92,8 @@
           if (window.location.hostname === "localhost") {
             const testMovesElement = document.getElementById('testMovesElem');
             testMovesElement.setAttribute("style", "display:")
+            const fenLibraryElement = document.getElementById('fenLibrary');
+            fenLibraryElement.setAttribute("style", "display:")
           }
           fen = window.location.hash
           if (!fen) {
@@ -116,8 +118,8 @@
           <button type="submit">start with FEN</button>
           <button onclick="undoLastMove(); return false" type="button">Undo</button>
           <button style="display:none" id="testMovesElem" onclick="testMovesStart(); return false" type="button">Test moves</button>
-          <a href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
-          &nbsp;&nbsp;&nbsp;Time last move: <span id="timeLastMove"></span>
+          <a id="fenLibrary" style="display:none" href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
+          &nbsp;Time: <span id="timeLastMove"></span>
         </form>
 
         <form id="computerForm" style="display: flex;padding:10px;">
