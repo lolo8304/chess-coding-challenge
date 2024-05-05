@@ -32,6 +32,7 @@ class Move {
     this.castlingRookStartIndex = castlingRookStartIndex; // castling king - rook position start
     this.castlingRookTargetIndex = castlingRookTargetIndex; // castling king - rook position target
     this.undoMove = undefined;
+    this.promotionPiece = Piece.None;
   }
   calculateFromAndTo(from, to) {
     this.from = from;
@@ -46,15 +47,34 @@ class Move {
     this.targetColor = this.targetPiece & Piece.COLOR_MASK;
   }
 
+  clone() {
+    return new Move(
+      this.board,
+      this.from,
+      this.to,
+      this.isHit,
+      this.enPassant,
+      this.enPassantTarget,
+      this.castlingKingTargetIndex,
+      this.castlingRookStartIndex,
+      this.castlingRookTargetIndex
+    );
+  }
+
   eq(other) {
     return (
       other?.from === this.from &&
       other?.to === this.to &&
+      other?.promotionPiece === this.promotionPiece &&
       other?.isHit === this.isHit
     );
   }
   eqFromTo(other) {
-    return other?.from === this.from && other?.to === this.to;
+    return (
+      other?.from === this.from &&
+      other?.to === this.to &&
+      other?.promotionPiece === this.promotionPiece
+    );
   }
 
   isEnPassantAttackable() {
@@ -99,7 +119,17 @@ class Move {
     return indexes;
   }
 
-  moveToNotation() {
+  toCoordinateNotation() {
+    const sourceSquare = this.board.indexToAlgebraic(this.from);
+    const targetSquare = this.board.indexToAlgebraic(this.to);
+    if (this.promotionPiece > 0) {
+      return sourceSquare + targetSquare + toPieceNotation(this.promotionPiece);
+    } else {
+      return sourceSquare + targetSquare;
+    }
+  }
+
+  toAlgebraicNotation() {
     if (this.castlingRookTargetIndex && this.castlingRookStartIndex) {
       const isLong =
         Math.abs(this.castlingKingTargetIndex - this.castlingRookStartIndex) ===
@@ -144,7 +174,11 @@ class Move {
 
   makeMove() {
     this.undoMove = new UndoMove();
-    this.setPiece(this.to, this.board.getPiece(this.from));
+    let toPiece = this.board.getPiece(this.from);
+    if (this.promotionPiece > 0) {
+      toPiece = this.promotionPiece;
+    }
+    this.setPiece(this.to, toPiece);
     this.setPiece(this.from, Piece.None);
     if (this.enPassant) {
       this.setPiece(this.enPassant, Piece.None);
@@ -249,7 +283,10 @@ class LegalMoves {
     } else if (isKnight(piece)) {
       this.generateKnightMoves(newMoves, index, piece, color);
     } else if (isPawn(piece)) {
-      this.generatePawnMoves(newMoves, index, piece, color);
+      const pawnMoves = [];
+      this.generatePawnMoves(pawnMoves, index, piece, color);
+      this.generatePawnPromotions(pawnMoves, color);
+      newMoves.push(...pawnMoves);
     }
   }
 
@@ -464,6 +501,32 @@ class LegalMoves {
       }
     }
   }
+  generatePawnPromotions(newPawnMoves, color) {
+    const targetPawnIndexes =
+      (color & Piece.WHITE) > 0
+        ? { startIndex: 0, endIndex: 7 }
+        : { startIndex: 56, endIndex: 63 };
+    const movesToIterate = [...newPawnMoves];
+    for (const move of movesToIterate) {
+      if (
+        targetPawnIndexes.startIndex <= move.to &&
+        move.to <= targetPawnIndexes.endIndex
+      ) {
+        let newMove = move;
+        newMove.promotionPiece = Piece.QUEEN | color;
+        newMove = move.clone();
+        newPawnMoves.push(newMove);
+        newMove.promotionPiece = Piece.ROOK | color;
+        newMove = move.clone();
+        newPawnMoves.push(newMove);
+        newMove.promotionPiece = Piece.KNIGHT | color;
+        newMove = move.clone();
+        newPawnMoves.push(newMove);
+        newMove.promotionPiece = Piece.BISHOP || color;
+      }
+    }
+  }
+
   generatePawnMoves(newMoves, startIndex, piece, color) {
     const startPawnIndex = (color & Piece.WHITE) > 0 ? 6 : 1;
     const directionOffsetY = (color & Piece.WHITE) > 0 ? -1 : 1;
@@ -475,14 +538,17 @@ class LegalMoves {
     // move 2
     if (grid.gridY === startPawnIndex) {
       const newY = grid.gridY + 2 * directionOffsetY;
+      const newY1 = grid.gridY + directionOffsetY;
       const newX = grid.gridX;
       if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
         const targetIndex = newY * 8 + newX;
+        const middleIndex = newY1 * 8 + newX;
         const enPassantTargetIndex = (newY - directionOffsetY) * 8 + newX;
         if (0 <= targetIndex && targetIndex < 64) {
           const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
           const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
-          if (pieceOnTargetIndexColor === 0) {
+          const pieceOnMiddleIndex = this.boardData.getPiece(middleIndex);
+          if (pieceOnTargetIndexColor === 0 && pieceOnMiddleIndex === 0) {
             const newMove = new Move(
               this.boardData,
               startIndex,

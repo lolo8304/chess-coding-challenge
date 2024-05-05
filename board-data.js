@@ -404,7 +404,7 @@ class BoardData {
           lastMove
       );
     }
-    lastMove.undoLastMove()
+    lastMove.undoLastMove();
   }
 
   makeMove(move, withHalfMoves) {
@@ -432,18 +432,23 @@ class BoardData {
   }
 
   testMoves(maxDepth) {
-    const oldVerbose = verbose
-    verbose = 0
-    const numPositions = new MoveGeneratorTest(this, this.legalMoves.color).testMoves(maxDepth);
-    verbose = oldVerbose
-    return numPositions
+    const oldVerbose = verbose;
+    verbose = 0;
+    const numPositions = new MoveGeneratorTest(
+      this,
+      this.legalMoves.color,
+      maxDepth
+    ).testMoves(maxDepth);
+    verbose = oldVerbose;
+    return numPositions;
   }
 }
 
 class MoveGeneratorTest {
-  constructor(data, color) {
+  constructor(data, color, maxDepth) {
     this.data = data;
     this.color = color;
+    this.maxDepth = maxDepth
   }
   testMoves(depth) {
     if (depth === 0) {
@@ -451,7 +456,7 @@ class MoveGeneratorTest {
     }
     const moves = [...this.data.legalMoves.moves];
     let numPositions = 0;
-    depth > 1 && console.log(("  ".repeat(depth))+depth+" Test for "+moves.length+" moves")
+    //depth > 0 && console.log("  ".repeat(depth) + depth + " Test for " + moves.length + " moves");
     for (const move of moves) {
       this.data.makeMove(move, false);
       const newColor = this.color ^ Piece.COLOR_MASK;
@@ -459,9 +464,14 @@ class MoveGeneratorTest {
       game.color = newColor;
       //redraw();
 
-      numPositions += new MoveGeneratorTest(this.data, newColor).testMoves(
+      const inc = this.testMoves(
         depth - 1
       );
+      numPositions += inc;
+      (depth === this.maxDepth) &&
+        console.log(
+          move.toCoordinateNotation() + ": " + (inc)
+        );
       this.data.undoMove(move);
       this.data.setLegalMovesFor(this.color);
       game.color = this.color;

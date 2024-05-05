@@ -56,20 +56,22 @@ class Game {
       this.x + this.w / 2,
       this.y - this.paddingTop + this.paddingTop / 2 + (fontSize - 10) / 2
     );
-    if (this.time > 1.0) {
-      const movedBlack = this.computerMoveNow(this.computerBlack, 0);
-      const movedWhite = this.computerMoveNow(this.computerWhite, 0);
-      if (
-        !movedWhite &&
-        !movedBlack &&
-        this.computerBlack.isOn() &&
-        this.computerWhite.isOn()
-      ) {
-        this.computerWhite.isTurn(this.color);
+    if (!this.board.data.isFinished()) {
+      if (this.time > 1.0) {
+        const movedBlack = this.computerMoveNow(this.computerBlack, 0);
+        const movedWhite = this.computerMoveNow(this.computerWhite, 0);
+        if (
+          !movedWhite &&
+          !movedBlack &&
+          this.computerBlack.isOn() &&
+          this.computerWhite.isOn()
+        ) {
+          this.computerWhite.isTurn(this.color);
+        }
+        this.time = 0;
       }
-      this.time = 0;
+      this.time += this.velocity;
     }
-    this.time += this.velocity;
   }
 
   undoLastMove() {
