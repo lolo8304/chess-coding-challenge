@@ -27,7 +27,7 @@ class BoardData {
   }
 
   setPiece(index, piece) {
-    verbose &&
+    verbose > 1 &&
       console.log(
         "SET " +
           index +

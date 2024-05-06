@@ -22,10 +22,7 @@ class Move {
     this.board = board;
     this.calculateFromAndTo(from, to);
     this.isHit = isHit ? true : undefined;
-    this.isCheck =
-      isHit && (this.targetPiece & Piece.PIECES_MASK) === Piece.KING
-        ? true
-        : undefined;
+    this.isCheck = isHit && (this.targetPiece & Piece.PIECES_MASK) === Piece.KING;
     this.enPassant = enPassant; // enPassant
     this.enPassantTarget = enPassantTarget;
     this.castlingKingTargetIndex = castlingKingTargetIndex; // castling king - king position

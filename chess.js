@@ -9,7 +9,7 @@ const ROW_CELLS = 8; // count
 const COL_CELLS_AND_BOUNDARY = COL_CELLS;
 const ROW_CELLS_AND_BOUNDARY = ROW_CELLS;
 
-let verbose = 1; // 1 - default log, 2 - moves logs
+let verbose = 2; // 1 - default log, 2 - moves logs
 
 let cnv;
 let startScreen;
@@ -104,7 +104,7 @@ function undoLastMove() {
 
 function testMoves(callbackStats) {
   console.log("Start test move calculation:");
-  maxDepth = 2;
+  maxDepth = 3;
   for (let depth = 1; depth < maxDepth + 1; depth++) {
     const startTime = performance.now();
     const numPositions = game.board.data.testMoves(depth);

@@ -89,6 +89,8 @@
         function testMovesStart() {
           if (window.location.hostname === "localhost") {
             const testMovesElement = document.getElementById('testMovesElem');
+            const testMovesResults = document.getElementById('testMovesResults');
+            testMovesResults.innerHTML = ""
             testMovesElement.setAttribute("style", "display:none");
             setTimeout(function test() { 
               testMoves(stats)
