@@ -87,7 +87,7 @@
         }
 
         function testMovesStart() {
-          if (window.location.hostname === "localhost") {
+          if (window.location.hostname !== "localhost1") {
             const testMovesElement = document.getElementById('testMovesElem');
             const testMovesResults = document.getElementById('testMovesResults');
             testMovesResults.innerHTML = ""
@@ -99,7 +99,7 @@
           }
         }
         function setupFen() {
-          if (window.location.hostname === "localhost") {
+          if (window.location.hostname !== "localhost1") {
             const testMovesElement = document.getElementById('testMovesElem');
             testMovesElement.setAttribute("style", "display:")
             const fenLibraryElement = document.getElementById('fenLibrary');
