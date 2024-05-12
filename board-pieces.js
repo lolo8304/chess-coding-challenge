@@ -143,3 +143,11 @@ function toPieceNotation(piece) {
   }
   return notation || "";
 }
+
+if (typeof module !== "undefined") {
+  module.exports = {
+    Move,
+    MoveGeneratorStats,
+    MoveGeneratorTest,
+  };
+}

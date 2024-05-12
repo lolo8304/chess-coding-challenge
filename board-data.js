@@ -27,7 +27,7 @@ class BoardData {
   }
 
   setPiece(index, piece) {
-    verbose > 1 &&
+    /*verbose > 1 &&
       console.log(
         "SET " +
           index +
@@ -41,6 +41,7 @@ class BoardData {
           toFenChar(piece) +
           ")"
       );
+      */
     return this.setPieceInternal(index, piece);
   }
 
@@ -254,6 +255,11 @@ class BoardData {
     const opponentColor = color ^ Piece.COLOR_MASK;
     this.debuggingIndexes = [];
     const oldLegalMoves = this.legalMoves;
+    const opponentLegalMoves = this.opponentLegalMoves
+
+    // swtich color: some calculations need to opposite but this is now the
+    //this.opponentLegalMoves = this.legalMoves
+
     const newLegalMoves = this.newLegalMovesFor(color);
     if (oldLegalMoves.color != color || !newLegalMoves.eq(oldLegalMoves)) {
       this.legalMoves = newLegalMoves;
@@ -476,7 +482,20 @@ class MoveGeneratorStats {
     this.checkmates += stat.checkmates;
   }
   toString() {
-    return "Nodes=" + this.nodes + ", hits="+this.captures+", ep="+this.ep+", castles="+this.castles+", prom="+this.promotions+", checks="+this.checks;
+    return (
+      "Nodes=" +
+      this.nodes +
+      ", hits=" +
+      this.captures +
+      ", ep=" +
+      this.ep +
+      ", castles=" +
+      this.castles +
+      ", prom=" +
+      this.promotions +
+      ", checks=" +
+      this.checks
+    );
   }
 }
 
@@ -522,5 +541,11 @@ class MoveGeneratorTest {
       redraw();
     }
     return numPositions;
+  }
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    BoardData, MoveGeneratorStats, MoveGeneratorTest
   }
 }

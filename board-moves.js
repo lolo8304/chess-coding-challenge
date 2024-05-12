@@ -333,10 +333,10 @@ class LegalMoves {
   }
 
   myOpponentLegalMoves(color) {
-    if (this.boardData.legalMoves.color !== color) {
-      return this.boardData.legalMoves;
-    } else {
+    if (this.boardData.legalMoves.color === color) {
       return this.boardData.opponentLegalMoves;
+    } else {
+      return this.boardData.legalMoves;
     }
   }
 
@@ -360,6 +360,9 @@ class LegalMoves {
         }
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (targetIndex <= index && index < startIndex) {
+          if (this.myOpponentLegalMoves(color).moves.length === 0) {
+            console.log("Opponent moves = empty")
+          }
           if (this.myOpponentLegalMoves(color).hasAnyMoveToIndex(index)) {
             verbose &&
               console.log("Castling not allowed due to attack on " + index);
@@ -807,4 +810,10 @@ class LegalMoves {
     verbose >= 2 && console.table(movesToKeepWithoutCheck);
     this.moves = movesToKeepWithoutCheck;
   }
+}
+
+if (typeof module !== "undefined") {
+  module.exports = {
+    Move, MoveGeneratorStats, MoveGeneratorTest
+  };
 }

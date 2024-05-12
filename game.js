@@ -10,6 +10,11 @@ class Game {
     this.board = new Board(this.x, this.y, this.w, this.h, fen);
 
     this.color = this.board.data.legalMoves.color;
+    const v = verbose
+    verbose = 0;
+    this.board.data.setLegalMovesFor(this.color);
+    verbose = v;
+    // needs a two pass because of castling rules and no opponent data is there
     this.board.data.setLegalMovesFor(this.color);
 
     this.computerBlack = evaluators.newPlayerOff(

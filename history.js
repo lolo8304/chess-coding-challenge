@@ -28,3 +28,8 @@ class History {
     );
   }
 }
+if (typeof module !== "undefined") {
+  module.exports = {
+    History,
+  };
+}
