@@ -1,5 +1,9 @@
 # chess-coding-challenge
 
 
-# Color
+# lots of details still missing
+
+:-)
+
+Coming soon
 
