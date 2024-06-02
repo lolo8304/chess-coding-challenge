@@ -291,9 +291,13 @@ class BoardData {
     } else {
       this.legalMovesForSelectedIndex = [];
     }
-    if (this.check && this.legalMoves.moves.length === 0) {
+    if (this.legalMoves.moves.length === 0) {
       this.checkMate = true;
-      this.result = "CHECK MATE: " + PieceNames[this.opponentLegalMoves.color];
+      if (this.check) {
+        this.result = "CHECK MATE: " + PieceNames[this.opponentLegalMoves.color];
+      } else {
+        this.result = "STALEMATE: " + PieceNames[this.opponentLegalMoves.color];
+      }
     }
     //for (const move of this.opponentLegalMoves.moves) {
     //  this.debuggingIndexes.push(move);
