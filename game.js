@@ -10,7 +10,7 @@ class Game {
     this.board = new Board(this.x, this.y, this.w, this.h, fen);
 
     this.color = this.board.data.legalMoves.color;
-    const v = verbose
+    const v = verbose;
     verbose = 0;
     this.board.data.setLegalMovesFor(this.color);
     verbose = v;
@@ -18,12 +18,12 @@ class Game {
     this.board.data.setLegalMovesFor(this.color);
 
     this.computerBlack = evaluators.newPlayerOff(
-      "hit-random",
+      computerName,
       this.board.data,
       Piece.BLACK
-    );
+    ).on();
     this.computerWhite = evaluators.newPlayerOff(
-      "hit-random",
+      computerName,
       this.board.data,
       Piece.WHITE
     );
@@ -80,7 +80,14 @@ class Game {
   }
 
   undoLastMove() {
-    const lastMove = this.board.undoLastMove();
+    let lastMove = this.board.undoLastMove();
+    if (lastMove && this.nextComputer().isOn()) {
+      lastMove = this.board.undoLastMove();
+      if (lastMove) {
+        // change already to change back to the same again if opponent is auto
+        this.changeTurn();
+      }
+    }
     if (lastMove) {
       this.makeTurnAndCalculate(0);
     }
@@ -151,6 +158,13 @@ class Game {
 
   changeTurn() {
     this.color = this.color === Piece.WHITE ? Piece.BLACK : Piece.WHITE;
+  }
+
+  currentComputer() {
+    return this.color === Piece.WHITE ? this.computerWhite : this.computerBlack
+  }
+  nextComputer() {
+    return this.color === Piece.WHITE ? this.computerBlack : this.computerWhite
   }
 
   computerMoveBlack() {

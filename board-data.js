@@ -450,6 +450,31 @@ class BoardData {
     verbose = oldVerbose;
     return numPositions;
   }
+
+
+  opponentPawnCanAttackIndex(color, targetIndex) {
+    const directionOffsetY = (color & Piece.WHITE) > 0 ? -1 : 1;
+    const opponentPawnPieceIndexes = this.getPiecesCache(Piece.PAWN | (color ^ Piece.COLOR_MASK))
+    for (const index of opponentPawnPieceIndexes) {
+      // check if index 
+      const grid = this.indexToGrid(index)
+      grid.gridX--
+      grid.gridY += directionOffsetY
+      if (this.isValidGrid(grid)) {
+        const gridIndex = grid.gridY * 8 + grid.gridX
+        if (gridIndex === targetIndex) return true;
+      }
+      grid.gridX += 2
+      if (this.isValidGrid(grid)) {
+        const gridIndex = grid.gridY * 8 + grid.gridX
+        if (gridIndex === targetIndex) return true;
+      }
+    }
+    return false;
+  }
+  isValidGrid(grid) {
+    return grid.gridX >= 0 && grid.gridX < 8 && grid.gridY >= 0 && grid.gridY < 8
+  }
 }
 
 class MoveGeneratorStats {
@@ -546,6 +571,8 @@ class MoveGeneratorTest {
     }
     return numPositions;
   }
+
+
 }
 
 if (typeof module !== 'undefined') {

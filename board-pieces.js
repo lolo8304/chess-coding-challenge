@@ -144,6 +144,17 @@ function toPieceNotation(piece) {
   return notation || "";
 }
 
+const PieceEvaluations = {};
+PieceEvaluations[Piece.PAWN] = 100;
+PieceEvaluations[Piece.KNIGHT] = 300;
+PieceEvaluations[Piece.BISHOP] = 320;
+PieceEvaluations[Piece.ROOK] = 500;
+PieceEvaluations[Piece.QUEEN] = 900;
+
+function getPieceTypeValue(pieceType) {
+  return PieceEvaluations[pieceType] || 0;
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     Move,

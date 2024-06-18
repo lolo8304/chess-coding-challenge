@@ -22,7 +22,8 @@ class Move {
     this.board = board;
     this.calculateFromAndTo(from, to);
     this.isHit = isHit ? true : undefined;
-    this.isCheck = isHit && (this.targetPiece & Piece.PIECES_MASK) === Piece.KING;
+    this.isCheck =
+      isHit && (this.targetPiece & Piece.PIECES_MASK) === Piece.KING;
     this.enPassant = enPassant; // enPassant
     this.enPassantTarget = enPassantTarget;
     this.castlingKingTargetIndex = castlingKingTargetIndex; // castling king - king position
@@ -30,6 +31,7 @@ class Move {
     this.castlingRookTargetIndex = castlingRookTargetIndex; // castling king - rook position target
     this.undoMove = undefined;
     this.promotionPiece = Piece.None;
+    this.moveScoreGuess = 0;
   }
   calculateFromAndTo(from, to) {
     this.from = from;
@@ -266,7 +268,7 @@ class LegalMoves {
 
   getMovesOfMyKing() {
     const index = this.boardData.getKingPosition(this.color);
-    verbose &&
+    verbose === 2 &&
       console.log("Index of my KING (" + PieceNames[this.color] + ")=" + index);
     return this.getMovesFrom(index);
   }
@@ -361,10 +363,10 @@ class LegalMoves {
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (targetIndex <= index && index < startIndex) {
           if (this.myOpponentLegalMoves(color).moves.length === 0) {
-            console.log("Opponent moves = empty")
+            verbose === 2 && console.log("Opponent moves = empty");
           }
           if (this.myOpponentLegalMoves(color).hasAnyMoveToIndex(index)) {
-            verbose &&
+            verbose === 2 &&
               console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
             break;
@@ -376,7 +378,7 @@ class LegalMoves {
         this.myOpponentLegalMoves(color).hasAnyMoveToIndex(startIndex)
       ) {
         isEmpty = false;
-        verbose &&
+        verbose === 2 &&
           console.log(
             "Castling not allowed due because King " +
               startIndex +
@@ -411,7 +413,7 @@ class LegalMoves {
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (startIndex < index && index <= targetIndex) {
           if (this.myOpponentLegalMoves(color).hasAnyMoveToIndex(index)) {
-            verbose &&
+            verbose === 2 &&
               console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
             break;
@@ -423,7 +425,7 @@ class LegalMoves {
         this.myOpponentLegalMoves(color).hasAnyMoveToIndex(startIndex)
       ) {
         isEmpty = false;
-        verbose &&
+        verbose === 2 &&
           console.log(
             "Castling not allowed due because King " +
               startIndex +
@@ -777,7 +779,8 @@ class LegalMoves {
             }
           }
         }
-      } else if (moveOfKing.isHit) { // check 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -  move the king
+      } else if (moveOfKing.isHit) {
+        // check 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -  move the king
         movesToKeep.push(moveOfKing);
       }
     }
@@ -798,7 +801,7 @@ class LegalMoves {
         if (newMoves.length == 0) {
           movesToKeepWithoutCheck.push(moveOfKing);
         } else {
-          verbose && console.log("Remove move for king to go into check");
+          verbose === 2 && console.log("Remove move for king to go into check");
         }
 
         this.boardData.setPieceInternal(moveOfKing.from, moveOfKing.piece);
@@ -814,6 +817,8 @@ class LegalMoves {
 
 if (typeof module !== "undefined") {
   module.exports = {
-    Move, MoveGeneratorStats, MoveGeneratorTest
+    Move,
+    MoveGeneratorStats,
+    MoveGeneratorTest,
   };
 }
