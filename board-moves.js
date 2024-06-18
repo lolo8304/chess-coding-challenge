@@ -32,6 +32,7 @@ class Move {
     this.undoMove = undefined;
     this.promotionPiece = Piece.None;
     this.moveScoreGuess = 0;
+    this.randomScoreGuess = 0;
   }
   calculateFromAndTo(from, to) {
     this.from = from;

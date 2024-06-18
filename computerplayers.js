@@ -109,8 +109,8 @@ class ComputerPlayerAlphaBetaPruning extends ComputerPlayer {
     const { bestMove, evaluation, count, cutOffs } = new Evaluator(
       this.boardData,
       this.color
-    ).searchAlphaBetaPruning(2, -Infinity, Infinity, true);
-    console.log("Search: count=" + count + ", cuts: " + cutOffs);
+    ).searchAlphaBetaPruningAll(2, -Infinity, Infinity, true);
+    //console.log("Search: count=" + count + ", cuts: " + cutOffs);
     return bestMove;
   }
 }
@@ -150,8 +150,42 @@ class Evaluator {
     return material;
   }
 
-  searchAlphaBetaPruning(depth, alpha, beta, maximizingPlayer) {
+  searchAlphaBetaPruningAll(depth, alpha, beta, maximizingPlayer) {
+    const result = this.searchAlphaBetaPruning(
+      false,
+      depth,
+      alpha,
+      beta,
+      maximizingPlayer
+    );
+    console.log("Search all: best="+result.bestMove?.toAlgebraicNotation() +", count=" + result.count + ", cuts: " + result.cutOffs +", eval="+result.evaluation);
+    return result
+  }
+
+  searchAlphaBetaPruningCapturesOnly(depth, alpha, beta, maximizingPlayer) {
+    const result = this.searchAlphaBetaPruning(
+      true,
+      2,
+      alpha,
+      beta,
+      maximizingPlayer
+    );
+    //console.log("Search captures: best="+result.bestMove?.toAlgebraicNotation() +", count=" + result.count + ", cuts: " + result.cutOffs +", eval="+result.evaluation);
+    return result
+  }
+  searchAlphaBetaPruning(capturesOnly, depth, alpha, beta, maximizingPlayer) {
     if (depth === 0) {
+      if (!capturesOnly) {
+        const evalWithCapturesOnly = this.searchAlphaBetaPruningCapturesOnly(
+          depth,
+          alpha,
+          beta,
+          maximizingPlayer
+        );
+        if (evalWithCapturesOnly.bestMove) {
+          return evalWithCapturesOnly;
+        }
+      }
       return {
         bestMove: undefined,
         evaluation: this.evaluate(),
@@ -159,7 +193,10 @@ class Evaluator {
         cutOffs: 0,
       };
     }
-    const moves = this.orderMoves([...this.data.legalMoves.moves]);
+    let moves = this.orderMoves([...this.data.legalMoves.moves]);
+    if (capturesOnly) {
+      moves = moves.filter((x) => x.isHit);
+    }
     let minMaxEval = 0;
     if (maximizingPlayer) {
       minMaxEval = -Infinity;
@@ -193,7 +230,13 @@ class Evaluator {
       game.color = newColor;
 
       let { bestMove, evaluation, count, cutOffs } =
-        this.searchAlphaBetaPruning(depth - 1, alpha, beta, !maximizingPlayer);
+        this.searchAlphaBetaPruning(
+          capturesOnly,
+          depth - 1,
+          alpha,
+          beta,
+          !maximizingPlayer
+        );
       this.data.undoMove(move);
       this.data.setLegalMovesFor(this.color);
       game.color = this.color;
@@ -201,7 +244,7 @@ class Evaluator {
 
       if (maximizingPlayer) {
         if (evaluation > minMaxEval) {
-          currentBestMove = move
+          currentBestMove = move;
         }
         minMaxEval = Math.max(evaluation, minMaxEval);
         alpha = Math.max(evaluation, alpha);
@@ -209,7 +252,7 @@ class Evaluator {
         totalCutOffs += cutOffs;
       } else {
         if (evaluation < minMaxEval) {
-          currentBestMove = move
+          currentBestMove = move;
         }
         minMaxEval = Math.min(evaluation, minMaxEval);
         beta = Math.min(evaluation, beta);
@@ -257,9 +300,17 @@ class Evaluator {
           moveScoreGuess -= getPieceTypeValue(movePieceType);
         }
         move.moveScoreGuess = moveScoreGuess;
+        move.randomScoreGuess = Math.floor(Math.random() * 1000);
       }
     }
-    moves.sort((x, y) => x.moveScoreGuess - y.moveScoreGuess);
+    moves.sort((x, y) => {
+      const diff = x.moveScoreGuess - y.moveScoreGuess;
+      if (diff === 0) {
+        return x.randomScoreGuess - y.randomScoreGuess;
+      } else {
+        return diff;
+      }
+    });
     return moves;
   }
 }
