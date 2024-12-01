@@ -61,7 +61,7 @@ class BoardData {
   }
 
   getPiecesCache(piece) {
-    return piece > 0 ? this.piecesCache[`${piece}`] : undefined;
+    return (piece > 0 ? this.piecesCache[`${piece}`] : undefined) || [];
   }
 
   updatePiecesCache(index, oldPiece, piece) {
@@ -255,7 +255,7 @@ class BoardData {
     const opponentColor = color ^ Piece.COLOR_MASK;
     this.debuggingIndexes = [];
     const oldLegalMoves = this.legalMoves;
-    const opponentLegalMoves = this.opponentLegalMoves
+    const opponentLegalMoves = this.opponentLegalMoves;
 
     // swtich color: some calculations need to opposite but this is now the
     //this.opponentLegalMoves = this.legalMoves
@@ -294,7 +294,8 @@ class BoardData {
     if (this.legalMoves.moves.length === 0) {
       this.checkMate = true;
       if (this.check) {
-        this.result = "CHECK MATE: " + PieceNames[this.opponentLegalMoves.color];
+        this.result =
+          "CHECK MATE: " + PieceNames[this.opponentLegalMoves.color];
       } else {
         this.result = "STALEMATE: " + PieceNames[this.opponentLegalMoves.color];
       }
@@ -451,29 +452,32 @@ class BoardData {
     return numPositions;
   }
 
-
   opponentPawnCanAttackIndex(color, targetIndex) {
     const directionOffsetY = (color & Piece.WHITE) > 0 ? -1 : 1;
-    const opponentPawnPieceIndexes = this.getPiecesCache(Piece.PAWN | (color ^ Piece.COLOR_MASK))
+    const opponentPawnPieceIndexes = this.getPiecesCache(
+      Piece.PAWN | (color ^ Piece.COLOR_MASK)
+    );
     for (const index of opponentPawnPieceIndexes) {
-      // check if index 
-      const grid = this.indexToGrid(index)
-      grid.gridX--
-      grid.gridY += directionOffsetY
+      // check if index
+      const grid = this.indexToGrid(index);
+      grid.gridX--;
+      grid.gridY += directionOffsetY;
       if (this.isValidGrid(grid)) {
-        const gridIndex = grid.gridY * 8 + grid.gridX
+        const gridIndex = grid.gridY * 8 + grid.gridX;
         if (gridIndex === targetIndex) return true;
       }
-      grid.gridX += 2
+      grid.gridX += 2;
       if (this.isValidGrid(grid)) {
-        const gridIndex = grid.gridY * 8 + grid.gridX
+        const gridIndex = grid.gridY * 8 + grid.gridX;
         if (gridIndex === targetIndex) return true;
       }
     }
     return false;
   }
   isValidGrid(grid) {
-    return grid.gridX >= 0 && grid.gridX < 8 && grid.gridY >= 0 && grid.gridY < 8
+    return (
+      grid.gridX >= 0 && grid.gridX < 8 && grid.gridY >= 0 && grid.gridY < 8
+    );
   }
 }
 
@@ -571,12 +575,12 @@ class MoveGeneratorTest {
     }
     return numPositions;
   }
-
-
 }
 
-if (typeof module !== 'undefined') {
+if (typeof module !== "undefined") {
   module.exports = {
-    BoardData, MoveGeneratorStats, MoveGeneratorTest
-  }
+    BoardData,
+    MoveGeneratorStats,
+    MoveGeneratorTest,
+  };
 }

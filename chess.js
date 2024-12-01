@@ -9,7 +9,7 @@ const ROW_CELLS = 8; // count
 const COL_CELLS_AND_BOUNDARY = COL_CELLS;
 const ROW_CELLS_AND_BOUNDARY = ROW_CELLS;
 
-let verbose = 1; // 1 - default log, 2 - moves logs
+let verbose = 0; // 0 - none, 1 - default log, 2 - moves logs
 
 let cnv;
 let startScreen;
@@ -119,7 +119,7 @@ function testMoves(callbackStats) {
         diffTime +
         " ms"
     );
-    callbackStats(depth, numPositions)
+    callbackStats(depth, numPositions);
   }
 }
 

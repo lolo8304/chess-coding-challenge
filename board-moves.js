@@ -367,7 +367,7 @@ class LegalMoves {
             verbose === 2 && console.log("Opponent moves = empty");
           }
           if (this.myOpponentLegalMoves(color).hasAnyMoveToIndex(index)) {
-            verbose === 2 &&
+            verbose === 1 &&
               console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
             break;
@@ -379,7 +379,7 @@ class LegalMoves {
         this.myOpponentLegalMoves(color).hasAnyMoveToIndex(startIndex)
       ) {
         isEmpty = false;
-        verbose === 2 &&
+        verbose === 1 &&
           console.log(
             "Castling not allowed due because King " +
               startIndex +
@@ -399,6 +399,16 @@ class LegalMoves {
           targetIndex + 1
         );
         this.addMoveTo(newMove, newMoves);
+        if (startIndex === 4) {
+          verbose === 1 &&
+            console.log(
+              "Castling allowed for King " +
+                startIndex +
+                " for target " +
+                targetIndex
+            );
+          verbose === 1 && console.log(newMove);
+        }
       }
     }
 
@@ -770,19 +780,33 @@ class LegalMoves {
     // check which are moves that are in attack by opponent
     // opponent.to == movesOfTheKing.to
     for (const moveOfKing of movesOfTheKing) {
-      const kingsTargetInAttackLineNotAllowed =
-        this.checkAttackIndexes.includes(moveOfKing.to);
-      if (!kingsTargetInAttackLineNotAllowed) {
-        for (const opponentMove of this.myLegalMoves(color).moves) {
-          if (moveOfKing.to !== opponentMove.from) {
-            if (movesToKeep.find((x) => x.eqFromTo(moveOfKing)) === undefined) {
-              movesToKeep.push(moveOfKing);
+      const kingIsInCheckAndCastlingMove =
+        moveOfKing.castlingKingTargetIndex &&
+        this.checkAttackIndexes.includes(moveOfKing.from);
+      if (!kingIsInCheckAndCastlingMove) {
+        const kingsTargetInAttackLineNotAllowed =
+          this.checkAttackIndexes.includes(moveOfKing.to);
+        if (!kingsTargetInAttackLineNotAllowed) {
+          for (const opponentMove of this.myLegalMoves(color).moves) {
+            if (moveOfKing.to !== opponentMove.from) {
+              if (
+                movesToKeep.find((x) => x.eqFromTo(moveOfKing)) === undefined
+              ) {
+                movesToKeep.push(moveOfKing);
+              }
             }
           }
+        } else if (moveOfKing.isHit) {
+          // check 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -  move the king
+          movesToKeep.push(moveOfKing);
         }
-      } else if (moveOfKing.isHit) {
-        // check 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -  move the king
-        movesToKeep.push(moveOfKing);
+      } else {
+        verbose === 2 &&
+        console.log(
+          "Castling not allowed due because King " +
+            moveOfKing.from +
+            " is in check (remove pseudo illegal move)"
+        );
       }
     }
     // check if new opponent hits would check the king
