@@ -222,23 +222,23 @@ class Evaluator {
       this.color !== Piece.WHITE,
       this.opponentMaterialInfo.endgameT
     );
-/*
+
     this.myEvalation.mopUpScore = this.evaluateMopUp(
       this.color === Piece.WHITE,
       this.myMaterialInfo,
       this.opponentMaterialInfo
     );
-    */
-
+    
+/*
     if (this.data.checkMate) {
       this.myMaterialInfo.checkFactor = 1000;
     } else if (this.data.check) {
       this.myMaterialInfo.checkFactor = 5;
       console.log("I am in check");
     }
-
+*/
     const finalEval =
-      (maximizingPlayer ? 1 : 1) *
+      (maximizingPlayer ? 1 : -1) *
       (this.myEvalation.sum() - this.opponentEvaluation.sum());
     return finalEval;
   }
