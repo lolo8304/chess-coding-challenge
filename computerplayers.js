@@ -213,7 +213,7 @@ class Evaluator {
     this.countEvaluated++;
     this.myEvalation.materialScore = this.myMaterialInfo.materialScore;
     this.opponentEvaluation.materialScore = this.myMaterialInfo.materialScore;
-
+/*
     this.myEvalation.pieceSquareScore = this.evaluatePieceSquareTables(
       this.color === Piece.WHITE,
       this.myMaterialInfo.endgameT
@@ -222,7 +222,7 @@ class Evaluator {
       this.color !== Piece.WHITE,
       this.opponentMaterialInfo.endgameT
     );
-/*
+
     this.myEvalation.mopUpScore = this.evaluateMopUp(
       this.color === Piece.WHITE,
       this.myMaterialInfo,
@@ -601,7 +601,7 @@ class Evaluator {
         moveScoreGuess -= getPieceTypeValue(movePieceType);
       }
       move.moveScoreGuess = moveScoreGuess;
-      move.randomScoreGuess = Math.floor(Math.random() * 1000);
+      //move.randomScoreGuess = Math.floor(Math.random() * 1000);
     }
     moves.sort((x, y) => {
       const diff = x.moveScoreGuess - y.moveScoreGuess;
