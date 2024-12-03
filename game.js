@@ -17,11 +17,9 @@ class Game {
     // needs a two pass because of castling rules and no opponent data is there
     this.board.data.setLegalMovesFor(this.color);
 
-    this.computerBlack = evaluators.newPlayerOff(
-      computerName,
-      this.board.data,
-      Piece.BLACK
-    ).on();
+    this.computerBlack = evaluators
+      .newPlayerOff(computerName, this.board.data, Piece.BLACK)
+      .on();
     this.computerWhite = evaluators.newPlayerOff(
       computerName,
       this.board.data,
@@ -161,10 +159,10 @@ class Game {
   }
 
   currentComputer() {
-    return this.color === Piece.WHITE ? this.computerWhite : this.computerBlack
+    return this.color === Piece.WHITE ? this.computerWhite : this.computerBlack;
   }
   nextComputer() {
-    return this.color === Piece.WHITE ? this.computerBlack : this.computerWhite
+    return this.color === Piece.WHITE ? this.computerBlack : this.computerWhite;
   }
 
   computerMoveBlack() {

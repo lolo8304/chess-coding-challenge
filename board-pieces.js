@@ -151,6 +151,8 @@ PieceEvaluations[Piece.BISHOP] = 320;
 PieceEvaluations[Piece.ROOK] = 500;
 PieceEvaluations[Piece.QUEEN] = 900;
 
+const PieceEvaluationsHighValuePiecesForHits = [Piece.QUEEN, Piece.ROOK]
+
 function getPieceTypeValue(pieceType) {
   return PieceEvaluations[pieceType] || 0;
 }
@@ -161,4 +163,129 @@ if (typeof module !== "undefined") {
     MoveGeneratorStats,
     MoveGeneratorTest,
   };
+}
+
+class PieceSquareTable {
+  static Pawns = [
+    0, 0, 0, 0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 50, 50, 50, 10, 10, 20, 30, 30,
+    20, 10, 10, 5, 5, 10, 25, 25, 10, 5, 5, 0, 0, 0, 20, 20, 0, 0, 0, 5, -5,
+    -10, 0, 0, -10, -5, 5, 5, 10, 10, -20, -20, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0,
+    0,
+  ];
+
+  static Rooks = [
+    0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, 10, 10, 10, 10, 5, -5, 0, 0, 0, 0, 0, 0,
+    -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0,
+    0, -5, -5, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 5, 5, 0, 0, 0,
+  ];
+
+  static Knights = [
+    -50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 0, 0, 0, -20, -40, -30,
+    0, 10, 15, 15, 10, 0, -30, -30, 5, 15, 20, 20, 15, 5, -30, -30, 0, 15, 20,
+    20, 15, 0, -30, -30, 5, 10, 15, 15, 10, 5, -30, -40, -20, 0, 5, 5, 0, -20,
+    -40, -50, -40, -30, -30, -30, -30, -40, -50,
+  ];
+  static Bishops = [
+    -20, -10, -10, -10, -10, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0,
+    5, 10, 10, 5, 0, -10, -10, 5, 5, 10, 10, 5, 5, -10, -10, 0, 10, 10, 10, 10,
+    0, -10, -10, 10, 10, 10, 10, 10, 10, -10, -10, 5, 0, 0, 0, 0, 5, -10, -20,
+    -10, -10, -10, -10, -10, -10, -20,
+  ];
+  static Queens = [
+    -20, -10, -10, -5, -5, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5,
+    5, 5, 5, 0, -10, -5, 0, 5, 5, 5, 5, 0, -5, 0, 0, 5, 5, 5, 5, 0, -5, -10, 5,
+    5, 5, 5, 5, 0, -10, -10, 0, 5, 0, 0, 0, 0, -10, -20, -10, -10, -5, -5, -10,
+    -10, -20,
+  ];
+  static KingStart = [
+    -80, -70, -70, -70, -70, -70, -70, -80, -60, -60, -60, -60, -60, -60, -60,
+    -60, -40, -50, -50, -60, -60, -50, -50, -40, -30, -40, -40, -50, -50, -40,
+    -40, -30, -20, -30, -30, -40, -40, -30, -30, -20, -10, -20, -20, -20, -20,
+    -20, -20, -10, 20, 20, -5, -5, -5, -5, 20, 20, 20, 30, 10, 0, 0, 10, 30, 20,
+  ];
+
+  static KingEnd = [
+    -20, -10, -10, -10, -10, -10, -10, -20, -5, 0, 5, 5, 5, 5, 0, -5, -10, -5,
+    20, 30, 30, 20, -5, -10, -15, -10, 35, 45, 45, 35, -10, -15, -20, -15, 30,
+    40, 40, 30, -15, -20, -25, -20, 20, 25, 25, 20, -20, -25, -30, -25, 0, 0, 0,
+    0, -25, -30, -50, -30, -30, -30, -30, -30, -30, -50,
+  ];
+
+  static {
+    this.Tables = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const whiteIndex = 0;
+    const blackIndex = 8;
+    this.Tables[Piece.PAWN + whiteIndex] = this.Pawns;
+    this.Tables[Piece.ROOK + whiteIndex] = this.Rooks;
+    this.Tables[Piece.KNIGHT + whiteIndex] = this.Knights;
+    this.Tables[Piece.BISHOP + whiteIndex] = this.Bishops;
+    this.Tables[Piece.QUEEN + whiteIndex] = this.Queens;
+
+    this.Tables[Piece.PAWN + blackIndex] = this.getFlippedTable(this.Pawns);
+    this.Tables[Piece.ROOK + blackIndex] = this.getFlippedTable(this.Rooks);
+    this.Tables[Piece.KNIGHT + blackIndex] = this.getFlippedTable(this.Knights);
+    this.Tables[Piece.BISHOP + blackIndex] = this.getFlippedTable(this.Bishops);
+    this.Tables[Piece.QUEEN + blackIndex] = this.getFlippedTable(this.Queens);
+  }
+
+  static getFlippedTable(table) {
+    const flippedTable = Array(table.length).fill(0);
+    for (let i = 0; i < table.length; i++) {
+      const rank = 7 - Math.floor(i / 8);
+      const file = i % 8;
+      const flippedIndex = rank * 8 + file;
+      flippedTable[flippedIndex] = table[i];
+    }
+    return flippedTable;
+  }
+
+  static read(table, square, isWhite) {
+    if (isWhite) {
+      const file = square % 8;
+      const rank = Math.floor(square / 8);
+      const flippedRank = 7 - rank;
+      square = flippedRank * 8 + file;
+    }
+    return table[square];
+  }
+}
+
+function IndexToCoord(index) {
+  const rank = 7 - Math.floor(index / 8);
+  const file = index % 8;
+  return {
+    index,
+    rankIndex: rank,
+    y: rank,
+    fileIndex: file,
+    x: file,
+  };
+}
+function CoordToIndex(coord) {
+  return coord.rankIndex * 8 + coord.fileIndex;
+}
+
+const OrthogonalDistance = Array.from({ length: 64 }, () => Array(64).fill(0));
+const CentreManhattanDistance = Array.from({ length: 64 }, () => 0);
+const KingDistance = Array.from({ length: 64 }, () => Array(64).fill(0));
+
+for (let indexA = 0; indexA < 64; indexA++) {
+  const coordA = IndexToCoord(indexA);
+  const fileDstFromCentre = Math.max(
+    3 - coordA.fileIndex,
+    coordA.fileIndex - 4
+  );
+  const rankDstFromCentre = Math.max(
+    3 - coordA.rankIndex,
+    coordA.rankIndex - 4
+  );
+  CentreManhattanDistance[indexA] = fileDstFromCentre + rankDstFromCentre;
+
+  for (let indexB = 0; indexB < 64; indexB++) {
+    const coordB = IndexToCoord(indexB);
+    const rankDistance = Math.abs(coordA.rankIndex - coordB.rankIndex);
+    const fileDistance = Math.abs(coordA.fileIndex - coordB.fileIndex);
+    OrthogonalDistance[indexA][indexB] = rankDistance + fileDistance;
+    KingDistance[indexA][indexB] = Math.max(rankDistance, fileDistance);
+  }
 }

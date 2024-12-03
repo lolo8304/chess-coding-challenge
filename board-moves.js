@@ -37,14 +37,17 @@ class Move {
   calculateFromAndTo(from, to) {
     this.from = from;
     this.to = to;
-    this.color = this.board.getPiece(from) & Piece.COLOR_MASK;
-    this.colorName = PieceNames[this.board.getPiece(from) & Piece.COLOR_MASK];
-    this.pieceName = PieceNames[this.board.getPiece(from) & Piece.PIECES_MASK];
     this.piece = this.board.getPiece(from);
     this.pieceOnly = this.piece & Piece.PIECES_MASK;
+    this.color = this.piece & Piece.COLOR_MASK;
+    this.colorName = PieceNames[this.color];
+    this.pieceName = PieceNames[this.pieceOnly];
+
     this.targetPiece = this.board.getPiece(to);
     this.targetPieceOnly = this.targetPiece & Piece.PIECES_MASK;
     this.targetColor = this.targetPiece & Piece.COLOR_MASK;
+    this.targetColorName = PieceNames[this.targetColor];
+    this.targetPieceName = PieceNames[this.targetPieceOnly];
   }
 
   clone() {
@@ -802,11 +805,11 @@ class LegalMoves {
         }
       } else {
         verbose === 2 &&
-        console.log(
-          "Castling not allowed due because King " +
-            moveOfKing.from +
-            " is in check (remove pseudo illegal move)"
-        );
+          console.log(
+            "Castling not allowed due because King " +
+              moveOfKing.from +
+              " is in check (remove pseudo illegal move)"
+          );
       }
     }
     // check if new opponent hits would check the king
