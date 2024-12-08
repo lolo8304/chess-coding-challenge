@@ -1,3 +1,16 @@
+// Check if the code is running in Node.js
+if (typeof window === "undefined") {
+  // Use dynamic import in Node.js
+  import("./board-data.js")
+    .then((pkg) => {
+      BoardData = pkg.BoardData;
+    })
+    .catch((err) => {
+      console.error("Failed to load the board module:", err);
+    });
+}
+
+
 class Board {
   constructor(x, y, w, h, fen) {
     this.h = h;
@@ -110,19 +123,18 @@ class Board {
       this.data.legalMoves.checkAttackOnPinnedPieces.includes(index);
     if (
       (this.data.isNotFinished() && checkMoves.length > 0) ||
-      isInCheckAttack 
+      isInCheckAttack
     ) {
       fill("rgba(255, 255, 0, 0.4)");
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
     if (
       (this.data.isNotFinished() && checkMoves.length > 0) ||
-       isInCheckAttackInPinnedPieces
+      isInCheckAttackInPinnedPieces
     ) {
       fill("rgba(255, 140, 0, 0.4)");
       rect(pos.x, pos.y, CELL_SIZE, CELL_SIZE);
     }
-    
 
     const size = Math.floor(CELL_SIZE / 4);
     textSize(size);

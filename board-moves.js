@@ -554,7 +554,7 @@ class LegalMoves {
         newMove.promotionPiece = Piece.KNIGHT | color;
         newMove = move.clone();
         newPawnMoves.push(newMove);
-        newMove.promotionPiece = Piece.BISHOP || color;
+        newMove.promotionPiece = Piece.BISHOP | color;
       }
     }
   }

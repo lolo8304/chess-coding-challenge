@@ -1,13 +1,24 @@
+// Check if the code is running in Node.js
+if (typeof window === "undefined") {
+  // Use dynamic import in Node.js
+  import("./bit-board.js")
+    .then((pkg) => {
+      BitBoard = pkg.BitBoard;
+    })
+    .catch((err) => {
+      console.error("Failed to load the board module:", err);
+    });
+}
 class BoardData {
   constructor(history, fen) {
     this.check = false;
     this.checkMate = false;
     this.debuggingIndexes = [];
     this.history = history;
+    this.castlingOptions = new Set(["K", "Q", "k", "q"]);
     this.squares = new Array(64).fill(0);
     this.piecesCache = {};
     this.selectedIndex = NOT_SELECTED;
-    this.enPassantMove = undefined;
     this.halfMoveCounter = 0;
     this.nextFullMoveCounter = 1;
     this.resetHalfMoveCounter();
@@ -18,10 +29,35 @@ class BoardData {
     this.result = undefined;
   }
 
+  newHash(color) {
+    const lastMove = this.history.lastMove();
+    const enPassantFile =
+      lastMove && lastMove.enPassantTarget
+        ? this.indexToGrid(lastMove.enPassantTarget).gridX
+        : undefined;
+    return new BitBoard(
+      this.squares,
+      enPassantFile,
+      this.castlingOptions,
+      color
+    ).zobristHash;
+  }
+
+  zobristHash() {
+    return ZobristHash.computeHash(this.squares, this.color);
+  }
+
   selectCellIndex(index) {
     this.selectedIndex = index;
   }
 
+  checkPiece(piece) {
+    if (piece && piece > 0 && piece < 8) {
+      var e = new Error();
+      console.log(e.stack);
+      console.log("!!!!!!!!!!!!!!!!!!!! piece " + piece);
+    }
+  }
   getPiece(index) {
     return this.squares[index];
   }
@@ -47,6 +83,7 @@ class BoardData {
 
   setPieceInternal(index, piece) {
     const oldPiece = this.getPiece(index);
+    this.checkPiece(piece);
     this.squares[index] = piece;
     this.updatePiecesCache(index, oldPiece, piece);
     return oldPiece;
@@ -107,6 +144,9 @@ class BoardData {
         short: castlingOptionsString.includes("k"),
       },
     };
+    this.castlingOptions = new Set(
+      castlingOptionsString.replaceAll(" ", "").replaceAll("-", "").split("")
+    );
     if (!castlingOptions["w"].long) {
       this.history.storeMove(
         new Move(

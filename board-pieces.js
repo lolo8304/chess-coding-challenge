@@ -17,7 +17,7 @@ const Piece = {
 
   COLOR_MASK: 24,
 };
-
+const MAX_DEPTH = 4;
 const SlidingPieces = [Piece.BISHOP, Piece.ROOK, Piece.QUEEN];
 
 const PieceNames = {
@@ -54,8 +54,15 @@ function toFenChar(piece) {
 const CastlingPositionsWhite = [56, 63];
 const CastlingPositionsBlack = [0, 7];
 
-const FEN_start = fen_hash
-  ? fen_hash
+function fenHash() {
+  if (typeof fen_hash !== "undefined") {
+    return fen_hash;
+  } else {
+    return undefined;
+  }
+}
+const FEN_start = fenHash()
+  ? fenHash()
   : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 //const FEN_start = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
 const FEN_Pieces = {
@@ -151,7 +158,7 @@ PieceEvaluations[Piece.BISHOP] = 320;
 PieceEvaluations[Piece.ROOK] = 500;
 PieceEvaluations[Piece.QUEEN] = 900;
 
-const PieceEvaluationsHighValuePiecesForHits = [Piece.QUEEN, Piece.ROOK]
+const PieceEvaluationsHighValuePiecesForHits = [Piece.QUEEN, Piece.ROOK];
 
 function getPieceTypeValue(pieceType) {
   return PieceEvaluations[pieceType] || 0;
@@ -159,9 +166,7 @@ function getPieceTypeValue(pieceType) {
 
 if (typeof module !== "undefined") {
   module.exports = {
-    Move,
-    MoveGeneratorStats,
-    MoveGeneratorTest,
+    Piece,
   };
 }
 

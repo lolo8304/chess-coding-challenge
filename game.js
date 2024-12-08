@@ -1,3 +1,14 @@
+// Check if the code is running in Node.js
+if (typeof window === "undefined") {
+  // Use dynamic import in Node.js
+  import("./board.js")
+    .then((pkg) => {
+      Board = pkg.Board;
+    })
+    .catch((err) => {
+      console.error("Failed to load the board module:", err);
+    });
+}
 class Game {
   constructor(w, h, padding, paddingTop, paddingBottom, fen) {
     this.h = h;

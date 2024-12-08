@@ -26,6 +26,7 @@ class ComputerPlayer {
     this.color = color;
     this._isOn = false;
     this.runNext = false;
+    this.tt = TranspositionTableInstance();
   }
 
   isTurn(color) {
@@ -101,14 +102,12 @@ class ComputerPlayerRandomHitFirst extends ComputerPlayer {
   }
 }
 
-const MAX_DEPTH = 2;
-
 class ComputerPlayerAlphaBetaPruning extends ComputerPlayer {
   constructor(name, boardData, color) {
     super(name, boardData, color);
   }
   bestMove(legalMoves) {
-    const evalutator = new Evaluator(this.boardData, this.color);
+    const evalutator = new Evaluator(this.tt, this.boardData, this.color);
     const { bestMove, evaluation, count, cutOffs } =
       evalutator.searchAlphaBetaPruningAll(
         MAX_DEPTH,
@@ -199,7 +198,8 @@ class MaterialInfo {
 }
 
 class Evaluator {
-  constructor(data, color) {
+  constructor(tt, data, color) {
+    this.tt = tt;
     this.countEvaluated = 0;
     this.data = data;
     this.color = color;
@@ -213,7 +213,7 @@ class Evaluator {
     this.countEvaluated++;
     this.myEvalation.materialScore = this.myMaterialInfo.materialScore;
     this.opponentEvaluation.materialScore = this.myMaterialInfo.materialScore;
-/*
+
     this.myEvalation.pieceSquareScore = this.evaluatePieceSquareTables(
       this.color === Piece.WHITE,
       this.myMaterialInfo.endgameT
@@ -228,8 +228,8 @@ class Evaluator {
       this.myMaterialInfo,
       this.opponentMaterialInfo
     );
-    
 
+    /*
     if (this.data.checkMate) {
       this.myMaterialInfo.checkFactor = 1000;
     } else if (this.data.check) {
@@ -238,8 +238,9 @@ class Evaluator {
     }
 */
     const finalEval =
-      (maximizingPlayer ? 1 : 1) *
+      (maximizingPlayer ? 1 : -1) *
       (this.myEvalation.sum() - this.opponentEvaluation.sum());
+
     return finalEval;
   }
 
@@ -392,6 +393,7 @@ class Evaluator {
         diffTime +
         " [ms]"
     );
+    this.tt.printStats();
     return result;
   }
 
@@ -418,14 +420,34 @@ class Evaluator {
           return evalWithCapturesOnly;
         }
       }
+      const newHash = this.data.newHash(game.color);
+      const ttResult = this.tt.use(game.color, newHash, alpha, beta, depth);
+      let evaluation = 0;
+      let bestMove = undefined;
+      if (ttResult) {
+        evaluation = ttResult.evaluation;
+        bestMove = ttResult.bestMove;
+      } else {
+        evaluation = this.evaluate(maximizingPlayer);
+        this.tt.store(newHash, depth, evaluation, TranspositionFlag.EXACT);
+      }
       return {
-        bestMove: undefined,
-        evaluation: this.evaluate(maximizingPlayer),
+        bestMove: bestMove,
+        evaluation: evaluation,
         count: 1,
         cutOffs: 0,
       };
     }
-
+    const newHash = this.data.newHash(game.color);
+    const ttResult = this.tt.use(game.color, newHash, alpha, beta, depth);
+    if (ttResult) {
+      return {
+        bestMove: ttResult.bestMove,
+        evaluation: ttResult.evaluation,
+        count: 1,
+        cutOffs: 0,
+      };
+    }
     let moves = [...this.data.legalMoves.moves];
     if (capturesOnly) {
       moves = moves.filter((x) => x.isHit);
@@ -461,7 +483,7 @@ class Evaluator {
     for (let indexMove = 0; indexMove < moves.length; indexMove++) {
       const move = moves[indexMove];
       this.data.makeMove(move, false);
-      const newColor = this.color ^ Piece.COLOR_MASK;
+      const newColor = origColor ^ Piece.COLOR_MASK;
       this.data.setLegalMovesFor(newColor);
       game.color = newColor;
 
@@ -494,17 +516,21 @@ class Evaluator {
       totalCutOffs += cutOffs;
 
       this.data.undoMove(move);
-      this.data.setLegalMovesFor(this.color);
-      game.color = this.color;
+      this.data.setLegalMovesFor(origColor);
+      game.color = origColor;
       redraw();
 
       // see https://www.appliedaicourse.com/blog/alpha-beta-pruning-in-artificial-intelligence/
+      let transpositionFlag = TranspositionFlag.EXACT;
       if (maximizingPlayer) {
         if (evaluation > minMaxEval) {
           currentBestMove = move;
         }
         minMaxEval = Math.max(minMaxEval, evaluation);
         alpha = Math.max(alpha, evaluation);
+        if (minMaxEval >= beta) {
+          transpositionFlag = TranspositionFlag.UPPERBOUND;
+        }
         totalCount += count;
       } else {
         if (evaluation < minMaxEval) {
@@ -512,6 +538,9 @@ class Evaluator {
         }
         minMaxEval = Math.min(minMaxEval, evaluation);
         beta = Math.min(beta, evaluation);
+        if (minMaxEval <= alpha) {
+          transpositionFlag = TranspositionFlag.LOWERBOUND;
+        }
         totalCount += count;
       }
 
@@ -539,6 +568,7 @@ class Evaluator {
               minMaxEval +
               ")"
           );
+        this.tt.store(newHash, depth, minMaxEval, transpositionFlag, move);
         return {
           bestMove: move,
           evaluation: minMaxEval,
@@ -562,6 +592,13 @@ class Evaluator {
           );
       }
     }
+    this.tt.store(
+      newHash,
+      depth,
+      minMaxEval,
+      TranspositionFlag.EXACT,
+      currentBestMove
+    );
     return {
       bestMove: currentBestMove,
       evaluation: minMaxEval,
