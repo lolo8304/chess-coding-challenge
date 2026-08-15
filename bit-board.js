@@ -12,7 +12,8 @@ if (typeof window === "undefined") {
 class BitBoard {
   constructor(squares, enPassantFile, castlingRights, color) {
     this.squares = squares;
-    this.enPassantFile = enPassantFile || undefined;
+    this.enPassantFile =
+      enPassantFile !== undefined ? enPassantFile : undefined;
     this.castlingRights = castlingRights || new Set(["K", "Q", "k", "q"]);
     this.colorToMove = color;
     if (this.colorToMove === undefined) throw new Error("Color is not defined for bitboard")

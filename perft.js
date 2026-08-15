@@ -127,6 +127,7 @@ function installProfiler(context) {
 
       perftProfiler.wrap(BoardData.prototype, "setLegalMovesFor", "BoardData.setLegalMovesFor");
       perftProfiler.wrap(BoardData.prototype, "setLegalMovesForPerft", "BoardData.setLegalMovesForPerft");
+      perftProfiler.wrap(BoardData.prototype, "setLegalMovesForSearch", "BoardData.setLegalMovesForSearch");
       perftProfiler.wrap(BoardData.prototype, "makeMove", "BoardData.makeMove");
       perftProfiler.wrap(BoardData.prototype, "undoMove", "BoardData.undoMove");
       perftProfiler.wrap(BoardData.prototype, "isIndexAttackedByColor", "BoardData.isIndexAttackedByColor");

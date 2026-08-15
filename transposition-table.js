@@ -16,7 +16,7 @@ class TranspositionTable {
     this.rejectedStores = 0;
     this.probes = 0;
     this.emptyMisses = 0;
-    this.hashCollisions = 0;
+    this.indexCollisions = 0;
     this.depthTooLow = 0;
     this.depthHits = 0;
     this.exactUsable = 0;
@@ -58,8 +58,8 @@ class TranspositionTable {
         this.boundNotUseful +
         ", empty=" +
         this.emptyMisses +
-        ", collision=" +
-        this.hashCollisions +
+        ", indexCollision=" +
+        this.indexCollisions +
         ", depthTooLow=" +
         this.depthTooLow +
         ", bestMoveOrderingHits=" +
@@ -129,7 +129,7 @@ class TranspositionTable {
       return undefined;
     }
     if (entry.hash !== hash) {
-      this.hashCollisions++;
+      this.indexCollisions++;
       return undefined;
     }
     if (entry.depth < requiredDepth) {
