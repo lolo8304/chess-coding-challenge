@@ -43,6 +43,9 @@ class Game {
 
   draw() {
     this.board.draw();
+    if (typeof updateConsolePhase === "function") {
+      updateConsolePhase();
+    }
     let turnText =
       this.color === Piece.WHITE
         ? "WHITE's turn" +
@@ -100,6 +103,9 @@ class Game {
     if (lastMove) {
       this.makeTurnAndCalculate(0);
     }
+    if (typeof updateConsolePhase === "function") {
+      updateConsolePhase();
+    }
   }
 
   makeTurnAndCalculate(depth, runComputerNow = true) {
@@ -120,8 +126,14 @@ class Game {
   }
 
   makeMove(move, depth, runComputerNow = true) {
+    if (typeof setGamePhase === "function") {
+      setGamePhase("play");
+    }
     this.board.makeMove(move, true);
     this.makeTurnAndCalculate(depth, runComputerNow);
+    if (typeof updateConsolePhase === "function") {
+      updateConsolePhase();
+    }
   }
 
   setTimeLastMove(startTime) {
@@ -160,6 +172,9 @@ class Game {
           clickedCellForTurn.index
         );
         if (clickedCellForTurn && validMove) {
+          if (typeof setGamePhase === "function") {
+            setGamePhase("play");
+          }
           this.board.clickedToString(clientY, clientX);
           this.board.selectCellIndex(clickedCellForTurn.index);
           this.board.data.setLegalMovesFor(this.color);
