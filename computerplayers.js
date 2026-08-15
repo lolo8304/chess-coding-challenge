@@ -213,14 +213,29 @@ class Evaluator {
     this.killerMoves = [];
     this.historyHeuristic = {};
     this.searchStats = {
-      cutoffSources: {
-        ttBestMove: 0,
-        winningCapture: 0,
-        promotion: 0,
-        killer: 0,
-        history: 0,
-        other: 0,
+      cutoffSources: this.createCutoffSourceStats(),
+      cutoffSourcesByDepth: {},
+      cutoffSourcesByMode: {
+        main: this.createCutoffSourceStats(),
+        quiescence: this.createCutoffSourceStats(),
       },
+      ttBestMove: {
+        available: 0,
+        legal: 0,
+        first: 0,
+        cutoff: 0,
+      },
+    };
+  }
+
+  createCutoffSourceStats() {
+    return {
+      ttBestMove: 0,
+      winningCapture: 0,
+      promotion: 0,
+      killer: 0,
+      history: 0,
+      other: 0,
     };
   }
 
@@ -516,6 +531,7 @@ class Evaluator {
       moves = captureMoves;
     }
     moves = this.orderMoves(moves, ttBestMove, ply);
+    this.recordTTBestMoveStats(ttBestMove, moves);
     let minMaxEval = 0;
     if (maximizingPlayer) {
       minMaxEval = -Infinity;
@@ -613,7 +629,7 @@ class Evaluator {
       if (beta <= alpha) {
         // move was too good, oppponent will avoid this posititon - snip
         totalCutOffs++;
-        this.recordCutoffSource(move);
+        this.recordCutoffSource(move, depth, capturesOnly);
         this.rememberCutoffMove(move, ply, depth);
         verbose === 1 &&
           console.log(
@@ -681,28 +697,95 @@ class Evaluator {
     };
   }
 
-  recordCutoffSource(move) {
+  recordCutoffSource(move, depth, capturesOnly) {
     const source = move.cutoffSource || "other";
     this.searchStats.cutoffSources[source]++;
+    if (!this.searchStats.cutoffSourcesByDepth[depth]) {
+      this.searchStats.cutoffSourcesByDepth[depth] =
+        this.createCutoffSourceStats();
+    }
+    this.searchStats.cutoffSourcesByDepth[depth][source]++;
+    const mode = capturesOnly ? "quiescence" : "main";
+    this.searchStats.cutoffSourcesByMode[mode][source]++;
+    if (source === "ttBestMove") {
+      this.searchStats.ttBestMove.cutoff++;
+    }
+  }
+
+  recordTTBestMoveStats(ttBestMove, moves) {
+    if (!ttBestMove) return;
+    this.searchStats.ttBestMove.available++;
+    let legalIndex = -1;
+    for (let i = 0; i < moves.length; i++) {
+      if (moves[i].eqFromTo(ttBestMove)) {
+        legalIndex = i;
+        break;
+      }
+    }
+    if (legalIndex === -1) return;
+    this.searchStats.ttBestMove.legal++;
+    if (legalIndex === 0) {
+      this.searchStats.ttBestMove.first++;
+    }
   }
 
   printSearchStats() {
     const sources = this.searchStats.cutoffSources;
+    const mainSources = this.searchStats.cutoffSourcesByMode.main;
+    const quiescenceSources = this.searchStats.cutoffSourcesByMode.quiescence;
+    const ttBestMove = this.searchStats.ttBestMove;
     console.log(
       "Cutoff sources: " +
-        "ttBestMove=" +
-        sources.ttBestMove +
-        ", winningCapture=" +
-        sources.winningCapture +
-        ", promotion=" +
-        sources.promotion +
-        ", killer=" +
-        sources.killer +
-        ", history=" +
-        sources.history +
-        ", other=" +
-        sources.other
+        this.formatCutoffSources(sources)
     );
+    console.log(
+      "Cutoff sources main: " +
+        this.formatCutoffSources(mainSources) +
+        "; quiescence: " +
+        this.formatCutoffSources(quiescenceSources)
+    );
+    console.log(
+      "Cutoff sources by depth: " +
+        this.formatCutoffSourcesByDepth()
+    );
+    console.log(
+      "TT best move: available=" +
+        ttBestMove.available +
+        ", legal=" +
+        ttBestMove.legal +
+        ", first=" +
+        ttBestMove.first +
+        ", cutoff=" +
+        ttBestMove.cutoff
+    );
+  }
+
+  formatCutoffSources(sources) {
+    return (
+      "ttBestMove=" +
+      sources.ttBestMove +
+      ", winningCapture=" +
+      sources.winningCapture +
+      ", promotion=" +
+      sources.promotion +
+      ", killer=" +
+      sources.killer +
+      ", history=" +
+      sources.history +
+      ", other=" +
+      sources.other
+    );
+  }
+
+  formatCutoffSourcesByDepth() {
+    const byDepth = this.searchStats.cutoffSourcesByDepth;
+    const depths = Object.keys(byDepth).sort((left, right) => left - right);
+    if (depths.length === 0) return "-";
+    const parts = [];
+    for (const depth of depths) {
+      parts.push(depth + "={" + this.formatCutoffSources(byDepth[depth]) + "}");
+    }
+    return parts.join("; ");
   }
 
   orderMoves(moves, ttBestMove = undefined, ply = 0) {
