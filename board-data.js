@@ -216,12 +216,11 @@ class BoardData {
   }
 
   addCastlingRightIfAvailable(rights, right, color, side) {
-    if (!this.castlingOptions.has(right)) return;
-
     const kingPiece = Piece.KING | color;
     if (this.history.hasMoved(kingPiece)) return;
 
     const rookStartIndex = this.castlingRookStartIndexes[color][side];
+    if (rookStartIndex === undefined) return;
     const rookPiece = Piece.ROOK | color;
     if (this.getPiece(rookStartIndex) !== rookPiece) return;
     if (this.history.hasMovedFromIndex(rookPiece, rookStartIndex)) return;
@@ -377,19 +376,25 @@ class BoardData {
 
     for (const char of castlingOptionsString) {
       if (char === "K") {
-        this.castlingRookStartIndexes[Piece.WHITE].short = 63;
+        this.setStandardCastlingRookStartIndex(Piece.WHITE, "short", 63);
       } else if (char === "Q") {
-        this.castlingRookStartIndexes[Piece.WHITE].long = 56;
+        this.setStandardCastlingRookStartIndex(Piece.WHITE, "long", 56);
       } else if (char === "k") {
-        this.castlingRookStartIndexes[Piece.BLACK].short = 7;
+        this.setStandardCastlingRookStartIndex(Piece.BLACK, "short", 7);
       } else if (char === "q") {
-        this.castlingRookStartIndexes[Piece.BLACK].long = 0;
+        this.setStandardCastlingRookStartIndex(Piece.BLACK, "long", 0);
       } else if ("A" <= char && char <= "H") {
         this.setChess960CastlingRookStartIndex(Piece.WHITE, char);
       } else if ("a" <= char && char <= "h") {
         this.setChess960CastlingRookStartIndex(Piece.BLACK, char);
       }
     }
+  }
+
+  setStandardCastlingRookStartIndex(color, side, rookIndex) {
+    const standardKingIndex = color === Piece.WHITE ? 60 : 4;
+    if (this.getKingPosition(color) !== standardKingIndex) return;
+    this.castlingRookStartIndexes[color][side] = rookIndex;
   }
 
   setChess960CastlingRookStartIndex(color, fileChar) {

@@ -110,6 +110,29 @@
       ]
     },
     {
+      "name": "standard-invalid-black-castling-rights-from-c8",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "r1k4r/pp3ppp/3bp3/q2n4/3p4/3P2P1/PP2PP1P/R1BK1BR1 b Qkq - 1 1",
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 50,
+          "castles": 0
+        },
+        {
+          "depth": 2,
+          "nodes": 1009,
+          "castles": 0
+        },
+        {
+          "depth": 3,
+          "nodes": 47787,
+          "castles": 0
+        }
+      ]
+    },
+    {
       "name": "chat-derived-black-to-move-en-passant",
       "variant": "standard",
       "source": "chat-history",

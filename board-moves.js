@@ -356,14 +356,20 @@ class LegalMoves {
     const rookPiece = Piece.ROOK | color;
     const rookPositions = this.boardData.castlingRookStartIndexes[color];
 
-    const rookLongPiece = this.boardData.getPiece(rookPositions.long);
+    const rookLongPiece =
+      rookPositions.long === undefined
+        ? Piece.None
+        : this.boardData.getPiece(rookPositions.long);
     const rookLongStillThere =
       (rookLongPiece & Piece.PIECES_MASK) === Piece.ROOK &&
       (rookLongPiece & Piece.COLOR_MASK) === color;
     const rookLongMoved =
       !rookLongStillThere ||
       this.boardData.history.hasMovedFromIndex(rookPiece, rookPositions.long);
-    const rookShortPiece = this.boardData.getPiece(rookPositions.short);
+    const rookShortPiece =
+      rookPositions.short === undefined
+        ? Piece.None
+        : this.boardData.getPiece(rookPositions.short);
     const rookShortStillThere =
       (rookShortPiece & Piece.PIECES_MASK) === Piece.ROOK &&
       (rookShortPiece & Piece.COLOR_MASK) === color;
@@ -691,7 +697,7 @@ class LegalMoves {
     if (movesToRemove.length > 0) {
       const filteredMoves = [];
       for (const move of this.moves) {
-        if (!move.isPartOf(movesToRemove)) {
+        if (!movesToRemove.includes(move)) {
           filteredMoves.push(move);
         }
       }
