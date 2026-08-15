@@ -88,11 +88,18 @@
         function updateCalculationDepth(depth) {
           setCalculationDepth(depth);
         }
+        function updateDebug(checked) {
+          verbose = checked ? 1 : 0;
+        }
         document.addEventListener('DOMContentLoaded', function() {
             setupFen();
             const calculationDepthElement = document.getElementById('calculationDepth');
             if (calculationDepthElement) {
               calculationDepthElement.value = getCalculationDepth();
+            }
+            const debugElement = document.getElementById('debug');
+            if (debugElement) {
+              debugElement.checked = verbose > 0;
             }
         });
 
@@ -157,6 +164,8 @@
             <option value="6">6</option>
             <option value="7">7</option>
           </select>
+          <label for="debug">Debug</label>
+          <input id="debug" type="checkbox" onchange="updateDebug(this.checked)" />
         </form>
 
         <form id="computerForm" style="display: flex;padding:10px;">
