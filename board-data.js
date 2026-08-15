@@ -469,7 +469,12 @@ class BoardData {
           lastMove
       );
     }
+    const undoMove = lastMove.undoMove;
     lastMove.undoLastMove();
+    if (undoMove) {
+      this.halfMoveCounter = undoMove.halfMoveCounter;
+      this.nextFullMoveCounter = undoMove.nextFullMoveCounter;
+    }
     this.check = false;
     this.checkMate = false;
     this.result = undefined;
@@ -478,6 +483,8 @@ class BoardData {
   makeMove(move, withHalfMoves) {
     this.history.storeMove(move);
     move.makeMove();
+    move.undoMove.halfMoveCounter = this.halfMoveCounter;
+    move.undoMove.nextFullMoveCounter = this.nextFullMoveCounter;
     this.selectCellIndex(NOT_SELECTED);
     if (withHalfMoves) {
       if (move.pieceOnly === Piece.PAWN || move.isHit) {

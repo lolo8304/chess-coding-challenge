@@ -1,6 +1,8 @@
 class UndoMove {
   constructor() {
     this.undoPiecesAtIndex = [];
+    this.halfMoveCounter = undefined;
+    this.nextFullMoveCounter = undefined;
   }
   addUndoPiece(index, piece) {
     this.undoPiecesAtIndex.push({ index, piece });
