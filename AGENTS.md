@@ -152,3 +152,7 @@ When working on AI:
 - Testing only happy-path moves and missing castling, en passant, promotion, check, and pinned-piece cases.
 - Assuming command-line Node execution is as complete as the browser path.
 
+## Run commands
+
+- whenever you make changes, accept that i also make changes myself and always use all changes in git. also for testing: don’t start any services. 
+- i have stated them in watch mode and you can use it via port 8080
