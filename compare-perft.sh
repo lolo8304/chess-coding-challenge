@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -lt 2 ]; then
+if [ "$#" -lt 1 ]; then
   echo "Usage: $0 <depth> \"<fen>\""
   echo "Example: $0 3 \"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\""
   exit 1
@@ -9,12 +9,22 @@ fi
 
 max_depth="$1"
 shift
-fen="$*"
+if [ "$#" -eq 0 ]; then
+  printf "FEN: " >&2
+  read -r fen
+else
+  fen="$*"
+fi
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 perft_js="$script_dir/perft.js"
 
 if ! [[ "$max_depth" =~ ^[0-9]+$ ]] || [ "$max_depth" -lt 1 ]; then
   echo "Error: depth must be a positive integer" >&2
+  exit 1
+fi
+
+if [ -z "$fen" ]; then
+  echo "Error: FEN must not be empty" >&2
   exit 1
 fi
 
