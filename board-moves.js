@@ -90,7 +90,7 @@ class Move {
   }
 
   getIndexes() {
-    if (this.pieceOnly === Piece.KNIGHT) {
+    if (!isSlidingPiece(this.pieceOnly)) {
       return [this.from, this.to];
     }
     const gridFrom = this.board.indexToGrid(this.from);
@@ -350,6 +350,9 @@ class LegalMoves {
 
   generateCastlingKings(newMoves, startIndex, piece, color) {
     if (this.boardData.history.hasMoved(piece)) return;
+    const kingStartIndex = color === Piece.WHITE ? 60 : 4;
+    if (startIndex !== kingStartIndex) return;
+    const opponentColor = color ^ Piece.COLOR_MASK;
     const rookPositions =
       color === Piece.WHITE ? CastlingPositionsWhite : CastlingPositionsBlack;
 
@@ -368,10 +371,7 @@ class LegalMoves {
         }
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (targetIndex <= index && index < startIndex) {
-          if (this.myOpponentLegalMoves(color).moves.length === 0) {
-            verbose === 2 && console.log("Opponent moves = empty");
-          }
-          if (this.myOpponentLegalMoves(color).hasAnyMoveToIndex(index)) {
+          if (this.boardData.isIndexAttackedByColor(index, opponentColor)) {
             verbose === 1 &&
               console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
@@ -381,7 +381,7 @@ class LegalMoves {
       }
       if (
         isEmpty &&
-        this.myOpponentLegalMoves(color).hasAnyMoveToIndex(startIndex)
+        this.boardData.isIndexAttackedByColor(startIndex, opponentColor)
       ) {
         isEmpty = false;
         verbose === 1 &&
@@ -428,7 +428,7 @@ class LegalMoves {
         }
         // is empty - check now if attack opponent attacks this index - only for index where king is moving
         if (startIndex < index && index <= targetIndex) {
-          if (this.myOpponentLegalMoves(color).hasAnyMoveToIndex(index)) {
+          if (this.boardData.isIndexAttackedByColor(index, opponentColor)) {
             verbose === 2 &&
               console.log("Castling not allowed due to attack on " + index);
             isEmpty = false;
@@ -438,7 +438,7 @@ class LegalMoves {
       }
       if (
         isEmpty &&
-        this.myOpponentLegalMoves(color).hasAnyMoveToIndex(startIndex)
+        this.boardData.isIndexAttackedByColor(startIndex, opponentColor)
       ) {
         isEmpty = false;
         verbose === 2 &&
