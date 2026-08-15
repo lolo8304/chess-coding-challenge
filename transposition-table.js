@@ -6,7 +6,7 @@ const TranspositionFlag = {
 
 class TranspositionTable {
   constructor(size = 1 << 20) {
-    console.log("new TranspositionTable()");
+    verbose > 0 && console.log("new TranspositionTable()");
     // Default size is 2^20 entries
     this.table = new Array(size);
     this.size = size;

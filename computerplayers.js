@@ -436,23 +436,25 @@ class Evaluator {
         );
     }
     const diffTime = Math.round(performance.now() - startTime);
-    console.log(
-      "Search all: best=" +
-        result.bestMove?.toAlgebraicNotation() +
-        ", name=" +
-        result.bestMove?.pieceName +
-        ", count=" +
-        totalCount +
-        ", cuts: " +
-        totalCutOffs +
-        ", eval=" +
-        result.evaluation +
-        ", time=" +
-        diffTime +
-        " [ms]"
-    );
-    this.printSearchStats();
-    this.tt.printStats();
+    if (verbose > 0) {
+      console.log(
+        "Search all: best=" +
+          result.bestMove?.toAlgebraicNotation() +
+          ", name=" +
+          result.bestMove?.pieceName +
+          ", count=" +
+          totalCount +
+          ", cuts: " +
+          totalCutOffs +
+          ", eval=" +
+          result.evaluation +
+          ", time=" +
+          diffTime +
+          " [ms]"
+      );
+      this.printSearchStats();
+      this.tt.printStats();
+    }
     return {
       bestMove: result.bestMove,
       evaluation: result.evaluation,
