@@ -71,6 +71,7 @@ function loadEngine(context) {
   [
     "board-pieces.js",
     "history.js",
+    "zobrist-keys.js",
     "zobrist.js",
     "bit-board.js",
     "board-moves.js",
