@@ -1,0 +1,41 @@
+[Event "Chess Coding Challenge AI vs Stockfish"]
+[Site "Local"]
+[Date "2026.08.15"]
+[Round "1"]
+[White "Chess Coding Challenge AI"]
+[Black "Stockfish"]
+[Result "1/2-1/2"]
+[WhiteElo "?"]
+[BlackElo "1320"]
+[TimeControl "-"]
+[PlyCount "160"]
+
+1. Nf3 c5 2. g3 e6 3. Nh4 Be7 4. Ng2 Qc7 5. a4 d5 6. Nc3 Nc6 7. Nxd5 exd5 8. Nf4
+Qd8 9. h3 Nf6 10. Ng2 Bd7 11. h4 O-O 12. Rb1 Re8 13. c3 c4 14. Rh2 Bd6 15. Rh1
+d4 16. b3 dxc3 17. bxc4 Bf5 18. dxc3 Bxb1 19. Bg5 Bf5 20. Ne3 Be5 21. Qc1 Qa5
+22. Bxf6 gxf6 23. Nd5 Be4 24. Rh3 Bxd5 25. g4 Be6 26. Bg2 Bxc3+ 27. Qxc3 Rac8
+28. Bxc6 Qc5 29. Bxe8 h5 30. Rg3 hxg4 31. h5 Rxe8 32. Re3 Qf5 33. h6 Qb1+ 34.
+Kd2 a5 35. Qxf6 Qg6 36. Qxg6+ fxg6 37. Rxe6 Rxe6 38. Kd3 g5 39. Kd2 Kh7 40. Kd3
+Rxh6 41. Kd4 Re6 42. f3 Kg7 43. fxg4 Rxe2 44. Kd3 Re6 45. c5 Re5 46. Kc4 Kf7 47.
+Kc3 Re6 48. Kd4 Ke7 49. Kd5 Kf7 50. Kd4 Ke7 51. Kd5 Kf7 52. Kd4 b6 53. Kd5 Ke7
+54. Kd4 Ke8 55. cxb6 Kd8 56. b7 Kc7 57. b8=Q+ Kxb8 58. Kd5 Re2 59. Kd6 Re8 60.
+Kc5 Kc7 61. Kd5 Kc8 62. Kc6 Re7 63. Kc5 Rb7 64. Kd6 Rb4 65. Kc6 Rb1 66. Kd5 Rb2
+67. Ke5 Kb8 68. Kd6 Rb1 69. Ke5 Rh1 70. Kd4 Kc8 71. Kc5 Ra1 72. Kb5 Kd7 73. Kxa5
+Rb1 74. Ka6 Kc7 75. Ka5 Rb2 76. Ka6 Kc6 77. Ka5 Rb1 78. Ka6 Kc7 79. Ka5 Kc6 80.
+Ka6 Rf1 1/2-1/2
+
+[Event "Chess Coding Challenge AI vs Stockfish"]
+[Site "Local"]
+[Date "2026.08.15"]
+[Round "2"]
+[White "Stockfish"]
+[Black "Chess Coding Challenge AI"]
+[Result "1-0"]
+[WhiteElo "1320"]
+[BlackElo "?"]
+[TimeControl "-"]
+[PlyCount "33"]
+
+1. c4 Na6 2. Nf3 h6 3. a3 c6 4. d4 g6 5. e3 Nc7 6. h3 Nf6 7. b3 g5 8. Nbd2 d6 9.
+Qc2 g4 10. Nh2 gxh3 11. g3 d5 12. Ndf3 b6 13. Ne5 dxc4 14. Bxc4 Rh7 15. Qxh7 Be6
+16. Qxf7+ Bxf7 17. Bxf7# 1-0
