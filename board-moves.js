@@ -170,7 +170,9 @@ class Move {
 
   undoLastMove() {
     if (this.undoMove) {
-      for (const indexAndPiece of this.undoMove.undoPiecesAtIndex) {
+      for (const indexAndPiece of this.undoMove.undoPiecesAtIndex
+        .slice()
+        .reverse()) {
         this.board.setPieceInternal(indexAndPiece.index, indexAndPiece.piece);
       }
       this.undoMove = undefined;
@@ -183,17 +185,20 @@ class Move {
     if (this.promotionPiece > 0) {
       toPiece = this.promotionPiece;
     }
+    if (this.castlingKingTargetIndex) {
+      const rookPiece = this.board.getPiece(this.castlingRookStartIndex);
+      this.setPiece(this.from, Piece.None);
+      if (this.castlingRookStartIndex !== this.from) {
+        this.setPiece(this.castlingRookStartIndex, Piece.None);
+      }
+      this.setPiece(this.to, toPiece);
+      this.setPiece(this.castlingRookTargetIndex, rookPiece);
+      return;
+    }
     this.setPiece(this.to, toPiece);
     this.setPiece(this.from, Piece.None);
     if (this.enPassant) {
       this.setPiece(this.enPassant, Piece.None);
-    }
-    if (this.castlingKingTargetIndex) {
-      this.setPiece(
-        this.castlingRookTargetIndex,
-        this.board.getPiece(this.castlingRookStartIndex)
-      );
-      this.setPiece(this.castlingRookStartIndex, Piece.None);
     }
   }
 
@@ -312,23 +317,22 @@ class LegalMoves {
     if (this.boardData.history.hasMoved(kingPiece))
       return { long: false, short: false };
     const rookPiece = Piece.ROOK | color;
-    const rookPositions =
-      color === Piece.WHITE ? CastlingPositionsWhite : CastlingPositionsBlack;
+    const rookPositions = this.boardData.castlingRookStartIndexes[color];
 
-    const rookLongPiece = this.boardData.getPiece(rookPositions[0]);
+    const rookLongPiece = this.boardData.getPiece(rookPositions.long);
     const rookLongStillThere =
       (rookLongPiece & Piece.PIECES_MASK) === Piece.ROOK &&
       (rookLongPiece & Piece.COLOR_MASK) === color;
     const rookLongMoved =
       !rookLongStillThere ||
-      this.boardData.history.hasMovedFromIndex(rookPiece, rookPositions[0]);
-    const rookShortPiece = this.boardData.getPiece(rookPositions[1]);
+      this.boardData.history.hasMovedFromIndex(rookPiece, rookPositions.long);
+    const rookShortPiece = this.boardData.getPiece(rookPositions.short);
     const rookShortStillThere =
       (rookShortPiece & Piece.PIECES_MASK) === Piece.ROOK &&
       (rookShortPiece & Piece.COLOR_MASK) === color;
     const rookShortMoved =
       !rookShortStillThere ||
-      this.boardData.history.hasMovedFromIndex(rookPiece, rookPositions[1]);
+      this.boardData.history.hasMovedFromIndex(rookPiece, rookPositions.short);
     return { long: !rookLongMoved, short: !rookShortMoved };
   }
 
@@ -350,119 +354,99 @@ class LegalMoves {
 
   generateCastlingKings(newMoves, startIndex, piece, color) {
     if (this.boardData.history.hasMoved(piece)) return;
-    const kingStartIndex = color === Piece.WHITE ? 60 : 4;
-    if (startIndex !== kingStartIndex) return;
     const opponentColor = color ^ Piece.COLOR_MASK;
-    const rookPositions =
-      color === Piece.WHITE ? CastlingPositionsWhite : CastlingPositionsBlack;
 
     const castlingOptions = this.getCastlingOptions(piece, color);
-    const longPossible = castlingOptions.long;
-    const shortPossible = castlingOptions.short;
+    this.addCastlingMove(newMoves, {
+      possible: castlingOptions.long,
+      startIndex,
+      targetIndex: color === Piece.WHITE ? 58 : 2,
+      rookStartIndex: this.boardData.castlingRookStartIndexes[color].long,
+      rookTargetIndex: color === Piece.WHITE ? 59 : 3,
+      opponentColor,
+    });
+    this.addCastlingMove(newMoves, {
+      possible: castlingOptions.short,
+      startIndex,
+      targetIndex: color === Piece.WHITE ? 62 : 6,
+      rookStartIndex: this.boardData.castlingRookStartIndexes[color].short,
+      rookTargetIndex: color === Piece.WHITE ? 61 : 5,
+      opponentColor,
+    });
+  }
 
-    if (longPossible) {
-      const targetIndex = rookPositions[0] + 2;
-      let isEmpty = true;
-      for (let index = rookPositions[0] + 1; index < startIndex; index++) {
-        const shouldBeEmptyPiece = this.boardData.getPiece(index);
-        if (shouldBeEmptyPiece != 0) {
-          isEmpty = false;
-          break;
-        }
-        // is empty - check now if attack opponent attacks this index - only for index where king is moving
-        if (targetIndex <= index && index < startIndex) {
-          if (this.boardData.isIndexAttackedByColor(index, opponentColor)) {
-            verbose === 1 &&
-              console.log("Castling not allowed due to attack on " + index);
-            isEmpty = false;
-            break;
-          }
-        }
-      }
+  addCastlingMove(
+    newMoves,
+    {
+      possible,
+      startIndex,
+      targetIndex,
+      rookStartIndex,
+      rookTargetIndex,
+      opponentColor,
+    }
+  ) {
+    if (!possible) return;
+
+    const minKingRook = Math.min(startIndex, rookStartIndex);
+    const maxKingRook = Math.max(startIndex, rookStartIndex);
+    for (let index = minKingRook + 1; index < maxKingRook; index++) {
+      if (this.boardData.getPiece(index) !== Piece.None) return;
+    }
+
+    const minFinal = Math.min(targetIndex, rookTargetIndex);
+    const maxFinal = Math.max(targetIndex, rookTargetIndex);
+    for (let index = minFinal; index <= maxFinal; index++) {
       if (
-        isEmpty &&
-        this.boardData.isIndexAttackedByColor(startIndex, opponentColor)
+        index !== startIndex &&
+        index !== rookStartIndex &&
+        this.boardData.getPiece(index) !== Piece.None
       ) {
-        isEmpty = false;
-        verbose === 1 &&
-          console.log(
-            "Castling not allowed due because King " +
-              startIndex +
-              " is in check"
-          );
-      }
-      if (isEmpty) {
-        const newMove = new Move(
-          this.boardData,
-          startIndex,
-          targetIndex,
-          false,
-          undefined,
-          undefined,
-          targetIndex,
-          rookPositions[0],
-          targetIndex + 1
-        );
-        this.addMoveTo(newMove, newMoves);
-        if (startIndex === 4) {
-          verbose === 1 &&
-            console.log(
-              "Castling allowed for King " +
-                startIndex +
-                " for target " +
-                targetIndex
-            );
-          verbose === 1 && console.log(newMove);
-        }
+        return;
       }
     }
 
-    if (shortPossible) {
-      let isEmpty = true;
-      const targetIndex = startIndex + 2;
-      for (let index = startIndex + 1; index < rookPositions[1]; index++) {
-        const shouldBeEmptyPiece = this.boardData.getPiece(index);
-        if (shouldBeEmptyPiece != 0) {
-          isEmpty = false;
-          break;
-        }
-        // is empty - check now if attack opponent attacks this index - only for index where king is moving
-        if (startIndex < index && index <= targetIndex) {
-          if (this.boardData.isIndexAttackedByColor(index, opponentColor)) {
-            verbose === 2 &&
-              console.log("Castling not allowed due to attack on " + index);
-            isEmpty = false;
-            break;
-          }
-        }
-      }
+    const minKingPath = Math.min(startIndex, targetIndex);
+    const maxKingPath = Math.max(startIndex, targetIndex);
+    for (let index = minKingPath; index <= maxKingPath; index++) {
       if (
-        isEmpty &&
-        this.boardData.isIndexAttackedByColor(startIndex, opponentColor)
+        index !== startIndex &&
+        index !== rookStartIndex &&
+        this.boardData.getPiece(index) !== Piece.None
       ) {
-        isEmpty = false;
-        verbose === 2 &&
-          console.log(
-            "Castling not allowed due because King " +
-              startIndex +
-              " is in check"
-          );
-      }
-      if (isEmpty) {
-        const newMove = new Move(
-          this.boardData,
-          startIndex,
-          targetIndex,
-          false,
-          undefined,
-          undefined,
-          targetIndex,
-          rookPositions[1],
-          targetIndex - 1
-        );
-        this.addMoveTo(newMove, newMoves);
+        return;
       }
     }
+
+    if (startIndex === targetIndex) {
+      if (this.boardData.isIndexAttackedByColor(startIndex, opponentColor)) {
+        return;
+      }
+    } else {
+      const kingStep = Math.sign(targetIndex - startIndex);
+      for (
+        let index = startIndex;
+        index !== targetIndex + kingStep;
+        index += kingStep
+      ) {
+        if (this.boardData.isIndexAttackedByColor(index, opponentColor)) return;
+      }
+    }
+
+    this.addMoveTo(
+      new Move(
+        this.boardData,
+        startIndex,
+        targetIndex,
+        false,
+        undefined,
+        undefined,
+        targetIndex,
+        rookStartIndex,
+        rookTargetIndex
+      ),
+      newMoves
+    );
   }
 
   generateKingMoves(newMoves, startIndex, piece, color) {
@@ -644,7 +628,7 @@ class LegalMoves {
             const pieceEnPOnTargetIndexColor =
               pieceEnPOnTargetIndex & Piece.COLOR_MASK;
             if (pieceEnPOnTargetIndexColor === oppositeColor) {
-              if (this.boardData.isLegalEnPassant(targetEnPIndex)) {
+              if (this.boardData.isLegalEnPassant(targetEnPIndex, targetIndex)) {
                 const newMove = new Move(
                   this.boardData,
                   startIndex,
