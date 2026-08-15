@@ -162,4 +162,4 @@ When working on AI:
 - use the existing main branch
 - before commit, make a branch in form "feature/<name>", commit the changes, push, and make a PR to main, and auto merge
 - after merge, checkout main and pull changes
-- 
+- always delete the feature branch after merge
