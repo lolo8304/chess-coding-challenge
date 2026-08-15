@@ -104,12 +104,10 @@ function clickedInCanvas(event) {
     return game.clicked(event.clientY ?? mouseY, event.clientX ?? mouseX);
   }
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
   const canvasX =
-    event.clientX === undefined ? mouseX : (event.clientX - rect.left) * scaleX;
+    event.clientX === undefined ? mouseX : event.clientX - rect.left;
   const canvasY =
-    event.clientY === undefined ? mouseY : (event.clientY - rect.top) * scaleY;
+    event.clientY === undefined ? mouseY : event.clientY - rect.top;
   return game.clicked(canvasY, canvasX);
 }
 
