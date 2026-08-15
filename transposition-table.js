@@ -146,15 +146,19 @@ class TranspositionTable {
   }
 }
 
-let TranspositionTableSingleton = undefined;
+let TranspositionTableSingleton = {};
 
-function TranspositionTableInstance() {
-  if (!TranspositionTableSingleton) {
-    TranspositionTableSingleton = new TranspositionTable();
+function TranspositionTableInstance(color = "default") {
+  if (!TranspositionTableSingleton[color]) {
+    TranspositionTableSingleton[color] = new TranspositionTable();
   }
-  return TranspositionTableSingleton;
+  return TranspositionTableSingleton[color];
 }
-function TranspositionTableReset() {
-  TranspositionTableSingleton = undefined;
-  return TranspositionTableInstance();
+function TranspositionTableReset(color) {
+  if (arguments.length === 0) {
+    TranspositionTableSingleton = {};
+    return TranspositionTableInstance();
+  }
+  TranspositionTableSingleton[color] = undefined;
+  return TranspositionTableInstance(color);
 }

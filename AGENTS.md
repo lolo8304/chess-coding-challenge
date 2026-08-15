@@ -156,3 +156,10 @@ When working on AI:
 
 - whenever you make changes, accept that i also make changes myself and always use all changes in git. also for testing: don’t start any services. 
 - i have stated them in watch mode and you can use it via port 8080
+
+## Commit, Push, merge rules
+
+- use the existing main branch
+- before commit, make a branch in form "feature/<name>", commit the changes, push, and make a PR to main, and auto merge
+- after merge, checkout main and pull changes
+- 

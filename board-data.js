@@ -38,9 +38,28 @@ class BoardData {
     return new BitBoard(
       this.squares,
       enPassantFile,
-      this.castlingOptions,
+      this.currentCastlingRights(),
       color
     ).zobristHash;
+  }
+
+  currentCastlingRights() {
+    const rights = new Set();
+    const legalMoves = this.legalMoves || new LegalMoves(Piece.WHITE, this);
+    const white = legalMoves.getCastlingOptions(
+      Piece.KING | Piece.WHITE,
+      Piece.WHITE
+    );
+    const black = legalMoves.getCastlingOptions(
+      Piece.KING | Piece.BLACK,
+      Piece.BLACK
+    );
+
+    if (white.short) rights.add("K");
+    if (white.long) rights.add("Q");
+    if (black.short) rights.add("k");
+    if (black.long) rights.add("q");
+    return rights;
   }
 
   zobristHash() {

@@ -26,7 +26,7 @@ class ComputerPlayer {
     this.color = color;
     this._isOn = false;
     this.runNext = false;
-    this.tt = TranspositionTableInstance();
+    this.tt = TranspositionTableInstance(color);
   }
 
   isTurn(color) {
@@ -128,6 +128,9 @@ evaluators.addEvaluator("hit-random", ComputerPlayerRandomHitFirst);
 evaluators.addEvaluator("alpha-beta", ComputerPlayerAlphaBetaPruning);
 computerName = "alpha-beta";
 
+const CHECKMATE_EVALUATION = 1000000;
+const MAX_QUIESCENCE_DEPTH = 2;
+
 class EvaluatorData {
   constructor() {
     this.materialScore = 0;
@@ -205,14 +208,19 @@ class Evaluator {
     this.color = color;
     this.myEvalation = new EvaluatorData();
     this.opponentEvaluation = new EvaluatorData();
-    this.myMaterialInfo = this.getMaterialInfo(color);
-    this.opponentMaterialInfo = this.getMaterialInfo(color ^ Piece.COLOR_MASK);
+    this.myMaterialInfo = undefined;
+    this.opponentMaterialInfo = undefined;
   }
 
   evaluate(maximizingPlayer) {
     this.countEvaluated++;
+    this.myMaterialInfo = this.getMaterialInfo(this.color);
+    this.opponentMaterialInfo = this.getMaterialInfo(
+      this.color ^ Piece.COLOR_MASK
+    );
     this.myEvalation.materialScore = this.myMaterialInfo.materialScore;
-    this.opponentEvaluation.materialScore = this.myMaterialInfo.materialScore;
+    this.opponentEvaluation.materialScore =
+      this.opponentMaterialInfo.materialScore;
 
     this.myEvalation.pieceSquareScore = this.evaluatePieceSquareTables(
       this.color === Piece.WHITE,
@@ -238,8 +246,7 @@ class Evaluator {
     }
 */
     const finalEval =
-      (maximizingPlayer ? 1 : -1) *
-      (this.myEvalation.sum() - this.opponentEvaluation.sum());
+      this.myEvalation.sum() - this.opponentEvaluation.sum();
 
     return finalEval;
   }
@@ -304,7 +311,7 @@ class Evaluator {
       isWhite
     );
     const pawnLate = this.evaluatePieceSquareTable(
-      PieceSquareTable.PawnsEnd,
+      PieceSquareTable.PawnsEnd || PieceSquareTable.Pawns,
       this.data.getPiecesCache(Piece.PAWN | colorIndex),
       isWhite
     );
@@ -333,7 +340,7 @@ class Evaluator {
 
   evaluatePieceSquareTable(table, pieceList, isWhite) {
     let value = 0;
-    for (var i = 0; i < pieceList.Count; i++) {
+    for (var i = 0; i < pieceList.length; i++) {
       value += PieceSquareTable.read(table, pieceList[i], isWhite);
     }
     return value;
@@ -400,7 +407,7 @@ class Evaluator {
   searchAlphaBetaPruningCapturesOnly(alpha, beta, maximizingPlayer) {
     const result = this.searchAlphaBetaPruning(
       true,
-      MAX_DEPTH,
+      MAX_QUIESCENCE_DEPTH,
       alpha,
       beta,
       maximizingPlayer
@@ -449,7 +456,7 @@ class Evaluator {
       };
     }
     let moves = [...this.data.legalMoves.moves];
-    if (capturesOnly) {
+    if (capturesOnly && !this.data.check) {
       moves = moves.filter((x) => x.isHit);
     }
     moves = this.orderMoves(moves);
@@ -463,7 +470,9 @@ class Evaluator {
       if (this.data.check) {
         return {
           bestMove: undefined,
-          evaluation: minMaxEval,
+          evaluation: maximizingPlayer
+            ? -CHECKMATE_EVALUATION - depth
+            : CHECKMATE_EVALUATION + depth,
           count: 1,
           cutOffs: 0,
         };
@@ -529,7 +538,7 @@ class Evaluator {
         minMaxEval = Math.max(minMaxEval, evaluation);
         alpha = Math.max(alpha, evaluation);
         if (minMaxEval >= beta) {
-          transpositionFlag = TranspositionFlag.UPPERBOUND;
+          transpositionFlag = TranspositionFlag.LOWERBOUND;
         }
         totalCount += count;
       } else {
@@ -539,7 +548,7 @@ class Evaluator {
         minMaxEval = Math.min(minMaxEval, evaluation);
         beta = Math.min(beta, evaluation);
         if (minMaxEval <= alpha) {
-          transpositionFlag = TranspositionFlag.LOWERBOUND;
+          transpositionFlag = TranspositionFlag.UPPERBOUND;
         }
         totalCount += count;
       }
@@ -568,9 +577,15 @@ class Evaluator {
               minMaxEval +
               ")"
           );
-        this.tt.store(newHash, depth, minMaxEval, transpositionFlag, move);
+        this.tt.store(
+          newHash,
+          depth,
+          minMaxEval,
+          transpositionFlag,
+          currentBestMove
+        );
         return {
-          bestMove: move,
+          bestMove: currentBestMove,
           evaluation: minMaxEval,
           count: totalCount,
           cutOffs: totalCutOffs,
@@ -641,9 +656,9 @@ class Evaluator {
       //move.randomScoreGuess = Math.floor(Math.random() * 1000);
     }
     moves.sort((x, y) => {
-      const diff = x.moveScoreGuess - y.moveScoreGuess;
+      const diff = y.moveScoreGuess - x.moveScoreGuess;
       if (diff === 0) {
-        return x.randomScoreGuess - y.randomScoreGuess;
+        return (y.randomScoreGuess || 0) - (x.randomScoreGuess || 0);
       } else {
         return diff;
       }
