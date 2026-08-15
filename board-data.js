@@ -438,6 +438,98 @@ class BoardData {
     return this.anyOfPiece(Piece.KING | color);
   }
 
+  isKingInCheck(color) {
+    return this.isIndexAttackedByColor(
+      this.getKingPosition(color),
+      color ^ Piece.COLOR_MASK
+    );
+  }
+
+  isIndexAttackedByColor(targetIndex, attackingColor) {
+    const targetGrid = this.indexToGrid(targetIndex);
+
+    const pawnDirection = (attackingColor & Piece.WHITE) > 0 ? -1 : 1;
+    for (const pawnIndex of this.getPiecesCache(Piece.PAWN | attackingColor)) {
+      const pawnGrid = this.indexToGrid(pawnIndex);
+      if (
+        pawnGrid.gridY + pawnDirection === targetGrid.gridY &&
+        Math.abs(pawnGrid.gridX - targetGrid.gridX) === 1
+      ) {
+        return true;
+      }
+    }
+
+    const knightOffsets = [
+      [-2, -1],
+      [-2, 1],
+      [2, -1],
+      [2, 1],
+      [-1, -2],
+      [-1, 2],
+      [1, -2],
+      [1, 2],
+    ];
+    for (const [dy, dx] of knightOffsets) {
+      const grid = {
+        gridY: targetGrid.gridY + dy,
+        gridX: targetGrid.gridX + dx,
+      };
+      if (
+        this.isValidGrid(grid) &&
+        this.getPiece(grid.gridY * 8 + grid.gridX) ===
+          (Piece.KNIGHT | attackingColor)
+      ) {
+        return true;
+      }
+    }
+
+    for (const kingIndex of this.getPiecesCache(Piece.KING | attackingColor)) {
+      const kingGrid = this.indexToGrid(kingIndex);
+      if (
+        Math.abs(kingGrid.gridY - targetGrid.gridY) <= 1 &&
+        Math.abs(kingGrid.gridX - targetGrid.gridX) <= 1
+      ) {
+        return true;
+      }
+    }
+
+    for (
+      let directionIndex = 0;
+      directionIndex < directionOffsets.length;
+      directionIndex++
+    ) {
+      const distanceToTarget = distanceToEdge[targetIndex][directionIndex];
+      const isOrthogonal = directionIndex < 4;
+      for (
+        let distance = 1;
+        distance <= Math.abs(distanceToTarget);
+        distance++
+      ) {
+        const index = targetIndex + directionOffsets[directionIndex] * distance;
+        const piece = this.getPiece(index);
+        if (piece === Piece.None) continue;
+
+        const pieceColor = piece & Piece.COLOR_MASK;
+        const pieceOnly = piece & Piece.PIECES_MASK;
+        if (pieceColor === attackingColor) {
+          if (isOrthogonal) {
+            if (pieceOnly === Piece.ROOK || pieceOnly === Piece.QUEEN) {
+              return true;
+            }
+          } else if (
+            pieceOnly === Piece.BISHOP ||
+            pieceOnly === Piece.QUEEN
+          ) {
+            return true;
+          }
+        }
+        break;
+      }
+    }
+
+    return false;
+  }
+
   resetHalfMoveCounter() {
     this.halfMoveCounter = 0;
     this.nextFullMoveCounter = Math.floor(this.halfMoveCounter / 2) + 1;
@@ -612,7 +704,7 @@ class MoveGeneratorTest {
         move.enPassant ? 1 : 0,
         move.castlingKingTargetIndex ? 1 : 0,
         move.promotionPiece ? 1 : 0,
-        move.isCheck ? 1 : 0,
+        this.data.isKingInCheck(this.data.legalMoves.color) ? 1 : 0,
         0,
         0,
         0
@@ -623,7 +715,7 @@ class MoveGeneratorTest {
     //depth > 0 && console.log("  ".repeat(depth) + depth + " Test for " + moves.length + " moves");
     for (const move of moves) {
       this.data.makeMove(move, false);
-      const newColor = this.color ^ Piece.COLOR_MASK;
+      const newColor = move.color ^ Piece.COLOR_MASK;
       this.data.setLegalMovesFor(newColor);
       game.color = newColor;
       redraw();
@@ -635,8 +727,8 @@ class MoveGeneratorTest {
         console.log(move.toCoordinateNotation() + ": " + inc);
 
       this.data.undoMove(move);
-      this.data.setLegalMovesFor(this.color);
-      game.color = this.color;
+      this.data.setLegalMovesFor(move.color);
+      game.color = move.color;
       redraw();
     }
     return numPositions;
