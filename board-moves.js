@@ -700,7 +700,8 @@ class LegalMoves {
   // checkout: http://127.0.0.1:5500/#r3k3/1p3p2/p2q2p1/bn3P2/1N2PQP1/PB6/3K1R1r/3R4%20w%20KQkq%20-%200%201
 
   limitingMovementPinnedPieces() {
-    const pinnedPieces = this.findPinnedPieces();
+    const kingIndex = this.boardData.getKingPosition(this.color);
+    const pinnedPieces = this.findPinnedPieces(kingIndex);
     this.checkAttackOnPinnedPieces = [];
     const filteredMoves = [];
     for (const move of this.moves) {
@@ -710,7 +711,7 @@ class LegalMoves {
       }
 
       if (move.enPassant) {
-        const keepMove = !this.moveExposesKing(move);
+        const keepMove = !this.boardData.doesMoveExposeKing(move, this.color);
         if (!keepMove) {
           this.checkAttackOnPinnedPieces.push(move.from, move.to);
         } else {
@@ -725,9 +726,13 @@ class LegalMoves {
         continue;
       }
 
-      const keepMove = pinnedPiece.allowedTargetIndexes[move.to] === true;
+      const keepMove = this.isMoveAllowedForPinnedPiece(
+        kingIndex,
+        pinnedPiece,
+        move.to
+      );
       if (!keepMove) {
-        this.checkAttackOnPinnedPieces.push(...pinnedPiece.attackLine);
+        this.addPinnedAttackLine(kingIndex, pinnedPiece);
       } else {
         filteredMoves.push(move);
       }
@@ -735,15 +740,7 @@ class LegalMoves {
     this.moves = filteredMoves;
   }
 
-  moveExposesKing(move) {
-    move.makeMove();
-    const kingInCheck = this.boardData.isKingInCheck(this.color);
-    move.undoLastMove();
-    return kingInCheck;
-  }
-
-  findPinnedPieces() {
-    const kingIndex = this.boardData.getKingPosition(this.color);
+  findPinnedPieces(kingIndex = this.boardData.getKingPosition(this.color)) {
     const pinnedPieces = {};
     if (kingIndex === undefined) {
       return pinnedPieces;
@@ -755,12 +752,10 @@ class LegalMoves {
       directionIndex++
     ) {
       const ray = rayTargets[kingIndex][directionIndex];
-      const attackLine = [];
       let pinnedIndex = undefined;
 
       for (let rayIndex = 0; rayIndex < ray.length; rayIndex++) {
         const index = ray[rayIndex];
-        attackLine.push(index);
         const piece = this.boardData.getPiece(index);
         if (piece === Piece.None) continue;
 
@@ -775,13 +770,9 @@ class LegalMoves {
           pinnedIndex !== undefined &&
           this.isSlidingAttackOnDirection(piece, directionIndex)
         ) {
-          const allowedTargetIndexes = {};
-          for (const target of attackLine) {
-            allowedTargetIndexes[target] = true;
-          }
           pinnedPieces[pinnedIndex] = {
-            allowedTargetIndexes,
-            attackLine: attackLine.slice(),
+            directionIndex,
+            attackerIndex: index,
           };
         }
         break;
@@ -789,6 +780,27 @@ class LegalMoves {
     }
 
     return pinnedPieces;
+  }
+
+  isMoveAllowedForPinnedPiece(kingIndex, pinnedPiece, targetIndex) {
+    if (kingIndex === undefined) return false;
+    const ray = rayTargets[kingIndex][pinnedPiece.directionIndex];
+    for (let rayIndex = 0; rayIndex < ray.length; rayIndex++) {
+      const index = ray[rayIndex];
+      if (index === targetIndex) return true;
+      if (index === pinnedPiece.attackerIndex) return false;
+    }
+    return false;
+  }
+
+  addPinnedAttackLine(kingIndex, pinnedPiece) {
+    if (kingIndex === undefined) return;
+    const ray = rayTargets[kingIndex][pinnedPiece.directionIndex];
+    for (let rayIndex = 0; rayIndex < ray.length; rayIndex++) {
+      const index = ray[rayIndex];
+      this.checkAttackOnPinnedPieces.push(index);
+      if (index === pinnedPiece.attackerIndex) return;
+    }
   }
 
   isSlidingAttackOnDirection(piece, directionIndex) {

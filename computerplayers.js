@@ -210,6 +210,8 @@ class Evaluator {
     this.opponentEvaluation = new EvaluatorData();
     this.myMaterialInfo = undefined;
     this.opponentMaterialInfo = undefined;
+    this.killerMoves = [];
+    this.historyHeuristic = {};
   }
 
   evaluate(maximizingPlayer) {
@@ -389,7 +391,8 @@ class Evaluator {
         currentDepth,
         alpha,
         beta,
-        maximizingPlayer
+        maximizingPlayer,
+        0
       );
       totalCount += result.count;
       totalCutOffs += result.cutOffs;
@@ -432,24 +435,33 @@ class Evaluator {
     };
   }
 
-  searchAlphaBetaPruningCapturesOnly(alpha, beta, maximizingPlayer) {
+  searchAlphaBetaPruningCapturesOnly(alpha, beta, maximizingPlayer, ply = 0) {
     const result = this.searchAlphaBetaPruning(
       true,
       MAX_QUIESCENCE_DEPTH,
       alpha,
       beta,
-      maximizingPlayer
+      maximizingPlayer,
+      ply
     );
     //console.log("Search captures: best="+result.bestMove?.toAlgebraicNotation() +", count=" + result.count + ", cuts: " + result.cutOffs +", eval="+result.evaluation);
     return result;
   }
-  searchAlphaBetaPruning(capturesOnly, depth, alpha, beta, maximizingPlayer) {
+  searchAlphaBetaPruning(
+    capturesOnly,
+    depth,
+    alpha,
+    beta,
+    maximizingPlayer,
+    ply = 0
+  ) {
     if (depth === 0) {
       if (!capturesOnly) {
         const evalWithCapturesOnly = this.searchAlphaBetaPruningCapturesOnly(
           alpha,
           beta,
-          maximizingPlayer
+          maximizingPlayer,
+          ply
         );
         if (evalWithCapturesOnly.bestMove) {
           return evalWithCapturesOnly;
@@ -486,9 +498,13 @@ class Evaluator {
     const ttBestMove = this.tt.bestMoveForOrdering(newHash);
     let moves = [...this.data.legalMoves.moves];
     if (capturesOnly && !this.data.check) {
-      moves = moves.filter((x) => x.isHit);
+      const captureMoves = [];
+      for (const move of moves) {
+        if (move.isHit) captureMoves.push(move);
+      }
+      moves = captureMoves;
     }
-    moves = this.orderMoves(moves, ttBestMove);
+    moves = this.orderMoves(moves, ttBestMove, ply);
     let minMaxEval = 0;
     if (maximizingPlayer) {
       minMaxEval = -Infinity;
@@ -522,7 +538,7 @@ class Evaluator {
       const move = moves[indexMove];
       this.data.makeMove(move, false);
       const newColor = origColor ^ Piece.COLOR_MASK;
-      this.data.setLegalMovesFor(newColor);
+      this.data.setLegalMovesForSearch(newColor);
       game.color = newColor;
 
       verbose === 1 &&
@@ -549,12 +565,13 @@ class Evaluator {
           depth - 1,
           alpha,
           beta,
-          !maximizingPlayer
+          !maximizingPlayer,
+          ply + 1
         );
       totalCutOffs += cutOffs;
 
       this.data.undoMove(move);
-      this.data.setLegalMovesFor(origColor);
+      this.data.setLegalMovesForSearch(origColor);
       game.color = origColor;
       redraw();
 
@@ -585,6 +602,7 @@ class Evaluator {
       if (beta <= alpha) {
         // move was too good, oppponent will avoid this posititon - snip
         totalCutOffs++;
+        this.rememberCutoffMove(move, ply, depth);
         verbose === 1 &&
           console.log(
             "...    MAXIMIZE=" +
@@ -651,11 +669,11 @@ class Evaluator {
     };
   }
 
-  orderMoves(moves, ttBestMove = undefined) {
+  orderMoves(moves, ttBestMove = undefined, ply = 0) {
     for (const move of moves) {
       let moveScoreGuess = 0;
       if (ttBestMove && move.eqFromTo(ttBestMove)) {
-        moveScoreGuess += 1000000;
+        moveScoreGuess += 1000000000;
       }
       const movePieceType = move.pieceOnly;
       if (move.isHit) {
@@ -663,6 +681,14 @@ class Evaluator {
 
         // priorize capturing opponent most valuable pieces with our least valueable pieces
         if (capturePieceType !== Piece.None) {
+          const captureDelta =
+            getPieceTypeValue(capturePieceType) -
+            getPieceTypeValue(movePieceType);
+          if (captureDelta >= 0) {
+            moveScoreGuess += 800000 + 10 * captureDelta;
+          } else {
+            moveScoreGuess += 10000 + captureDelta;
+          }
           if (capturePieceType !== movePieceType) {
             moveScoreGuess +=
               10 *
@@ -678,7 +704,13 @@ class Evaluator {
       }
       // if promottion add promotion value
       if (move.promotionPiece != Piece.None) {
-        moveScoreGuess += getPieceTypeValue(move.promotionPiece);
+        moveScoreGuess += 700000 + getPieceTypeValue(move.promotionPiece);
+      }
+      if (this.isKillerMove(move, ply)) {
+        moveScoreGuess += 600000;
+      }
+      if (this.isQuietMove(move)) {
+        moveScoreGuess += this.historyHeuristic[this.moveKey(move)] || 0;
       }
       // penalize moving our pieces to a square attacked by an opponent pawn
       if (this.data.opponentPawnCanAttackIndex(move.color, move.to)) {
@@ -696,5 +728,45 @@ class Evaluator {
       }
     });
     return moves;
+  }
+
+  rememberCutoffMove(move, ply, depth) {
+    if (!this.isQuietMove(move)) return;
+    this.rememberKillerMove(move, ply);
+    const key = this.moveKey(move);
+    this.historyHeuristic[key] =
+      (this.historyHeuristic[key] || 0) + depth * depth;
+  }
+
+  rememberKillerMove(move, ply) {
+    let killers = this.killerMoves[ply];
+    if (!killers) {
+      killers = [];
+      this.killerMoves[ply] = killers;
+    }
+    const key = this.moveKey(move);
+    for (let i = 0; i < killers.length; i++) {
+      if (killers[i] === key) return;
+    }
+    killers.unshift(key);
+    if (killers.length > 2) killers.pop();
+  }
+
+  isKillerMove(move, ply) {
+    const killers = this.killerMoves[ply];
+    if (!killers) return false;
+    const key = this.moveKey(move);
+    for (let i = 0; i < killers.length; i++) {
+      if (killers[i] === key) return true;
+    }
+    return false;
+  }
+
+  isQuietMove(move) {
+    return !move.isHit && move.promotionPiece === Piece.None;
+  }
+
+  moveKey(move) {
+    return move.from + ":" + move.to + ":" + move.promotionPiece;
   }
 }

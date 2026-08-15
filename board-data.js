@@ -31,40 +31,122 @@ class BoardData {
     this.opponentLegalMoves = undefined;
     this.legalMovesForSelectedIndex = [];
     this.currentEnPassantTarget = undefined;
+    this.hashCache = {};
     this.resetSquares(fen);
     this.result = undefined;
   }
 
   newHash(color) {
+    const cachedHash = this.hashCache[color];
+    if (cachedHash !== undefined) {
+      return cachedHash;
+    }
     const enPassantFile =
       this.currentEnPassantTarget !== undefined
         ? this.indexToGrid(this.currentEnPassantTarget).gridX
         : undefined;
-    return new BitBoard(
+    const hash = new BitBoard(
       this.squares,
       enPassantFile,
       this.currentCastlingRights(),
       color
     ).zobristHash;
+    this.hashCache[color] = hash;
+    return hash;
+  }
+
+  invalidateHash() {
+    this.hashCache = {};
+  }
+
+  enPassantFileForHash(enPassantTarget = this.currentEnPassantTarget) {
+    return enPassantTarget !== undefined
+      ? this.indexToGrid(enPassantTarget).gridX
+      : undefined;
+  }
+
+  hashAfterMove(
+    oldHash,
+    undoPiecesAtIndex,
+    oldColor,
+    newColor,
+    oldCastlingRights,
+    newCastlingRights,
+    oldEnPassantFile,
+    newEnPassantFile
+  ) {
+    let hash = oldHash;
+    const zobrist = ZobristHash();
+    const oldPiecesByIndex = {};
+    const changedIndexes = [];
+
+    for (let i = 0; i < undoPiecesAtIndex.length; i++) {
+      const undoPiece = undoPiecesAtIndex[i];
+      if (!Object.prototype.hasOwnProperty.call(oldPiecesByIndex, undoPiece.index)) {
+        oldPiecesByIndex[undoPiece.index] = undoPiece.piece;
+        changedIndexes.push(undoPiece.index);
+      }
+    }
+
+    for (let i = 0; i < changedIndexes.length; i++) {
+      const index = changedIndexes[i];
+      const oldPiece = oldPiecesByIndex[index];
+      const newPiece = this.squares[index];
+      if (oldPiece > Piece.None) {
+        hash ^= zobrist.zobristTable[oldPiece][index];
+      }
+      if (newPiece > Piece.None) {
+        hash ^= zobrist.zobristTable[newPiece][index];
+      }
+    }
+
+    if (oldColor !== newColor) {
+      hash ^= zobrist.sideToMoveKeyForBlack;
+    }
+    hash = this.xorCastlingRights(hash, oldCastlingRights);
+    hash = this.xorCastlingRights(hash, newCastlingRights);
+    hash = this.xorEnPassantFile(hash, oldEnPassantFile);
+    hash = this.xorEnPassantFile(hash, newEnPassantFile);
+    return hash;
+  }
+
+  xorCastlingRights(hash, castlingRights) {
+    const zobrist = ZobristHash();
+    if (castlingRights.has("K")) hash ^= zobrist.castlingKeys.K;
+    if (castlingRights.has("Q")) hash ^= zobrist.castlingKeys.Q;
+    if (castlingRights.has("k")) hash ^= zobrist.castlingKeys.k;
+    if (castlingRights.has("q")) hash ^= zobrist.castlingKeys.q;
+    return hash;
+  }
+
+  xorEnPassantFile(hash, enPassantFile) {
+    if (enPassantFile !== undefined) {
+      hash ^= ZobristHash().enPassantKeys[enPassantFile];
+    }
+    return hash;
   }
 
   currentCastlingRights() {
     const rights = new Set();
-    const legalMoves = this.legalMoves || new LegalMoves(Piece.WHITE, this);
-    const white = legalMoves.getCastlingOptions(
-      Piece.KING | Piece.WHITE,
-      Piece.WHITE
-    );
-    const black = legalMoves.getCastlingOptions(
-      Piece.KING | Piece.BLACK,
-      Piece.BLACK
-    );
-
-    if (white.short) rights.add("K");
-    if (white.long) rights.add("Q");
-    if (black.short) rights.add("k");
-    if (black.long) rights.add("q");
+    this.addCastlingRightIfAvailable(rights, "K", Piece.WHITE, "short");
+    this.addCastlingRightIfAvailable(rights, "Q", Piece.WHITE, "long");
+    this.addCastlingRightIfAvailable(rights, "k", Piece.BLACK, "short");
+    this.addCastlingRightIfAvailable(rights, "q", Piece.BLACK, "long");
     return rights;
+  }
+
+  addCastlingRightIfAvailable(rights, right, color, side) {
+    if (!this.castlingOptions.has(right)) return;
+
+    const kingPiece = Piece.KING | color;
+    if (this.history.hasMoved(kingPiece)) return;
+
+    const rookStartIndex = this.castlingRookStartIndexes[color][side];
+    const rookPiece = Piece.ROOK | color;
+    if (this.getPiece(rookStartIndex) !== rookPiece) return;
+    if (this.history.hasMovedFromIndex(rookPiece, rookStartIndex)) return;
+
+    rights.add(right);
   }
 
   zobristHash() {
@@ -111,6 +193,7 @@ class BoardData {
     this.squares[index] = piece;
     this.updatePiecesCache(index, oldPiece, piece);
     this.updateKingIndexes(index, oldPiece, piece);
+    this.invalidateHash();
     return oldPiece;
   }
 
@@ -385,15 +468,21 @@ class BoardData {
     return legalMoves;
   }
 
+  setLegalMovesForSearch(color) {
+    const legalMoves = this.newLegalMovesForPerft(color);
+    this.legalMoves = legalMoves;
+    this.check = this.isKingInCheck(color);
+    this.checkMate = false;
+    this.result = undefined;
+    return legalMoves;
+  }
+
   newLegalMovesForPerft(color) {
     const legalMoves = new LegalMoves(color, this);
     const pseudoMoves = legalMoves.generateMoves(color);
     const filteredMoves = [];
     for (const move of pseudoMoves) {
-      move.makeMove();
-      const isLegal = !this.isKingInCheck(color);
-      move.undoLastMove();
-      if (isLegal) {
+      if (!this.doesMoveExposeKing(move, color)) {
         filteredMoves.push(move);
       }
     }
@@ -536,7 +625,76 @@ class BoardData {
     return attacked;
   }
 
+  doesMoveExposeKing(move, color) {
+    const squares = this.squares;
+    const previousKingIndex = this.kingIndexes[color];
+    const oldFromPiece = squares[move.from];
+    const oldToPiece = squares[move.to];
+    const oldEnPassantPiece =
+      move.enPassant !== undefined ? squares[move.enPassant] : undefined;
+    let exposesKing = false;
+
+    if (move.castlingKingTargetIndex) {
+      const rookStartIndex = move.castlingRookStartIndex;
+      const rookTargetIndex = move.castlingRookTargetIndex;
+      const oldRookStartPiece = squares[rookStartIndex];
+      const oldRookTargetPiece = squares[rookTargetIndex];
+      const rookPiece = squares[rookStartIndex];
+
+      try {
+        squares[move.from] = Piece.None;
+        if (rookStartIndex !== move.from) {
+          squares[rookStartIndex] = Piece.None;
+        }
+        squares[move.to] = move.piece;
+        squares[rookTargetIndex] = rookPiece;
+        if (move.pieceOnly === Piece.KING) {
+          this.kingIndexes[color] = move.to;
+        }
+
+        exposesKing = this.isIndexAttackedByColor(
+          this.getKingPosition(color),
+          color ^ Piece.COLOR_MASK
+        );
+      } finally {
+        squares[move.from] = oldFromPiece;
+        squares[move.to] = oldToPiece;
+        squares[rookStartIndex] = oldRookStartPiece;
+        squares[rookTargetIndex] = oldRookTargetPiece;
+        this.kingIndexes[color] = previousKingIndex;
+      }
+      return exposesKing;
+    }
+
+    try {
+      squares[move.to] =
+        move.promotionPiece > Piece.None ? move.promotionPiece : move.piece;
+      squares[move.from] = Piece.None;
+      if (move.enPassant !== undefined) {
+        squares[move.enPassant] = Piece.None;
+      }
+      if (move.pieceOnly === Piece.KING) {
+        this.kingIndexes[color] = move.to;
+      }
+
+      exposesKing = this.isIndexAttackedByColor(
+        this.getKingPosition(color),
+        color ^ Piece.COLOR_MASK
+      );
+    } finally {
+      squares[move.from] = oldFromPiece;
+      squares[move.to] = oldToPiece;
+      if (move.enPassant !== undefined) {
+        squares[move.enPassant] = oldEnPassantPiece;
+      }
+      this.kingIndexes[color] = previousKingIndex;
+    }
+
+    return exposesKing;
+  }
+
   isIndexAttackedByColor(targetIndex, attackingColor) {
+    if (targetIndex === undefined) return false;
     const squares = this.squares;
     const pawnPiece = Piece.PAWN | attackingColor;
     const pawnAttackers = pawnAttackersByColor[attackingColor][targetIndex];
@@ -562,32 +720,26 @@ class BoardData {
       }
     }
 
-    for (
-      let directionIndex = 0;
-      directionIndex < directionOffsets.length;
-      directionIndex++
-    ) {
-      const isOrthogonal = directionIndex < 4;
+    const rookPiece = Piece.ROOK | attackingColor;
+    const bishopPiece = Piece.BISHOP | attackingColor;
+    const queenPiece = Piece.QUEEN | attackingColor;
+    for (let directionIndex = 0; directionIndex < 4; directionIndex++) {
       const ray = rayTargets[targetIndex][directionIndex];
       for (let distance = 0; distance < ray.length; distance++) {
         const index = ray[distance];
         const piece = squares[index];
         if (piece === Piece.None) continue;
-
-        const pieceColor = piece & Piece.COLOR_MASK;
-        const pieceOnly = piece & Piece.PIECES_MASK;
-        if (pieceColor === attackingColor) {
-          if (isOrthogonal) {
-            if (pieceOnly === Piece.ROOK || pieceOnly === Piece.QUEEN) {
-              return true;
-            }
-          } else if (
-            pieceOnly === Piece.BISHOP ||
-            pieceOnly === Piece.QUEEN
-          ) {
-            return true;
-          }
-        }
+        if (piece === rookPiece || piece === queenPiece) return true;
+        break;
+      }
+    }
+    for (let directionIndex = 4; directionIndex < 8; directionIndex++) {
+      const ray = rayTargets[targetIndex][directionIndex];
+      for (let distance = 0; distance < ray.length; distance++) {
+        const index = ray[distance];
+        const piece = squares[index];
+        if (piece === Piece.None) continue;
+        if (piece === bishopPiece || piece === queenPiece) return true;
         break;
       }
     }
@@ -633,20 +785,41 @@ class BoardData {
       this.nextFullMoveCounter = undoMove.nextFullMoveCounter;
       this.currentEnPassantTarget = undoMove.currentEnPassantTarget;
     }
+    this.hashCache = undoMove?.hashCache || {};
     this.check = false;
     this.checkMate = false;
     this.result = undefined;
   }
 
   makeMove(move, withHalfMoves) {
+    const oldColor = move.color;
+    const newColor = oldColor ^ Piece.COLOR_MASK;
+    const oldHash = this.newHash(oldColor);
+    const previousHashCache = { ...this.hashCache };
+    const oldCastlingRights = this.currentCastlingRights();
+    const oldEnPassantFile = this.enPassantFileForHash();
+
     this.history.storeMove(move);
     move.makeMove();
+    move.undoMove.hashCache = previousHashCache;
     move.undoMove.halfMoveCounter = this.halfMoveCounter;
     move.undoMove.nextFullMoveCounter = this.nextFullMoveCounter;
     move.undoMove.currentEnPassantTarget = this.currentEnPassantTarget;
     this.currentEnPassantTarget = move.isEnPassantAttackable()
       ? move.enPassantTarget
       : undefined;
+    const newHash = this.hashAfterMove(
+      oldHash,
+      move.undoMove.undoPiecesAtIndex,
+      oldColor,
+      newColor,
+      oldCastlingRights,
+      this.currentCastlingRights(),
+      oldEnPassantFile,
+      this.enPassantFileForHash()
+    );
+    this.hashCache = {};
+    this.hashCache[newColor] = newHash;
     this.selectCellIndex(NOT_SELECTED);
     if (withHalfMoves) {
       if (move.pieceOnly === Piece.PAWN || move.isHit) {
