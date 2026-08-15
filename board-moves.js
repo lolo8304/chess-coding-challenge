@@ -203,7 +203,10 @@ class Move {
   }
 
   isPartOf(listOfMoves) {
-    return listOfMoves.find((x) => x.eqFromTo(this)) !== undefined;
+    for (let i = 0; i < listOfMoves.length; i++) {
+      if (listOfMoves[i].eqFromTo(this)) return true;
+    }
+    return false;
   }
 }
 
@@ -293,10 +296,7 @@ class LegalMoves {
     } else if (isKnight(piece)) {
       this.generateKnightMoves(newMoves, index, piece, color);
     } else if (isPawn(piece)) {
-      const pawnMoves = [];
-      this.generatePawnMoves(pawnMoves, index, piece, color);
-      this.generatePawnPromotions(pawnMoves, color);
-      newMoves.push(...pawnMoves);
+      this.generatePawnMoves(newMoves, index, piece, color);
     }
   }
 
@@ -451,195 +451,151 @@ class LegalMoves {
 
   generateKingMoves(newMoves, startIndex, piece, color) {
     const oppositeColor = color ^ Piece.COLOR_MASK;
-    for (let i = 0; i < directionOffsets.length; i++) {
-      const targetIndex = startIndex + directionOffsets[i];
-      const grid = this.boardData.indexToGrid(startIndex);
-      const targetGrid = this.boardData.indexToGrid(targetIndex);
-      if (
-        (grid.gridX === 0 && targetGrid.gridX == 7) ||
-        (grid.gridX === 7 && targetGrid.gridX === 0) ||
-        (grid.gridY === 0 && targetGrid.gridY === 7) ||
-        (grid.gridY === 7 && targetGrid.gridY === 0)
-      ) {
-        // no moves allowed over edges
-      } else {
-        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
-        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
-        if (pieceOnTargetIndexColor === color) {
-          // skip
-        } else if (pieceOnTargetIndexColor === oppositeColor) {
-          this.addMoveTo(
-            new Move(this.boardData, startIndex, targetIndex, true),
-            newMoves
-          );
-        } else {
-          this.addMoveTo(
-            new Move(this.boardData, startIndex, targetIndex, false),
-            newMoves
-          );
-        }
+    const targets = kingAttackTargets[startIndex];
+    for (let i = 0; i < targets.length; i++) {
+      const targetIndex = targets[i];
+      const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
+      const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+      if (pieceOnTargetIndexColor === color) {
+        continue;
       }
+      this.addMoveTo(
+        new Move(
+          this.boardData,
+          startIndex,
+          targetIndex,
+          pieceOnTargetIndexColor === oppositeColor
+        ),
+        newMoves
+      );
     }
   }
+
   generateKnightMoves(newMoves, startIndex, piece, color) {
-    //
-    const knightsDirectionOffsetsYX = [
-      [-2, -1],
-      [-2, 1],
-      [2, -1],
-      [2, 1],
-      [-1, -2],
-      [-1, 2],
-      [1, -2],
-      [1, 2],
-    ];
     const oppositeColor = color ^ Piece.COLOR_MASK;
-    const grid = this.boardData.indexToGrid(startIndex);
-    for (let i = 0; i < knightsDirectionOffsetsYX.length; i++) {
-      const knightsGridDiff = knightsDirectionOffsetsYX[i];
-      const newY = grid.gridY + knightsGridDiff[0];
-      const newX = grid.gridX + knightsGridDiff[1];
-      if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
-        const targetIndex = newY * 8 + newX;
-        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
-        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
-        if (pieceOnTargetIndexColor === color) {
-          // skip
-        } else if (pieceOnTargetIndexColor === oppositeColor) {
-          this.addMoveTo(
-            new Move(this.boardData, startIndex, targetIndex, true),
-            newMoves
-          );
-        } else {
-          this.addMoveTo(
-            new Move(this.boardData, startIndex, targetIndex, false),
-            newMoves
-          );
-        }
+    const targets = knightAttackTargets[startIndex];
+    for (let i = 0; i < targets.length; i++) {
+      const targetIndex = targets[i];
+      const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
+      const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+      if (pieceOnTargetIndexColor === color) {
+        continue;
       }
+      this.addMoveTo(
+        new Move(
+          this.boardData,
+          startIndex,
+          targetIndex,
+          pieceOnTargetIndexColor === oppositeColor
+        ),
+        newMoves
+      );
     }
   }
-  generatePawnPromotions(newPawnMoves, color) {
-    const targetPawnIndexes =
-      (color & Piece.WHITE) > 0
-        ? { startIndex: 0, endIndex: 7 }
-        : { startIndex: 56, endIndex: 63 };
-    const movesToIterate = [...newPawnMoves];
-    for (const move of movesToIterate) {
-      if (
-        targetPawnIndexes.startIndex <= move.to &&
-        move.to <= targetPawnIndexes.endIndex
-      ) {
-        let newMove = move;
-        newMove.promotionPiece = Piece.QUEEN | color;
-        newMove = move.clone();
-        newPawnMoves.push(newMove);
-        newMove.promotionPiece = Piece.ROOK | color;
-        newMove = move.clone();
-        newPawnMoves.push(newMove);
-        newMove.promotionPiece = Piece.KNIGHT | color;
-        newMove = move.clone();
-        newPawnMoves.push(newMove);
-        newMove.promotionPiece = Piece.BISHOP | color;
-      }
+
+  addPawnMove(
+    newMoves,
+    startIndex,
+    targetIndex,
+    isHit,
+    color,
+    enPassant,
+    enPassantTarget
+  ) {
+    const promotionRank = color === Piece.WHITE ? 0 : 7;
+    const targetRank = Math.floor(targetIndex / ROW_CELLS);
+    if (targetRank !== promotionRank) {
+      this.addMoveTo(
+        new Move(
+          this.boardData,
+          startIndex,
+          targetIndex,
+          isHit,
+          enPassant,
+          enPassantTarget
+        ),
+        newMoves
+      );
+      return;
+    }
+
+    for (let i = 0; i < PromotionPieceTypes.length; i++) {
+      const move = new Move(
+        this.boardData,
+        startIndex,
+        targetIndex,
+        isHit,
+        enPassant,
+        enPassantTarget
+      );
+      move.promotionPiece = PromotionPieceTypes[i] | color;
+      this.addMoveTo(move, newMoves);
     }
   }
 
   generatePawnMoves(newMoves, startIndex, piece, color) {
-    const startPawnIndex = (color & Piece.WHITE) > 0 ? 6 : 1;
-    const directionOffsetY = (color & Piece.WHITE) > 0 ? -1 : 1;
-
-    const pieceOnly = piece & Piece.PIECES_MASK;
-    const pieceColor = piece & Piece.COLOR_MASK;
+    const startPawnRank = color === Piece.WHITE ? 6 : 1;
+    const directionOffsetY = color === Piece.WHITE ? -1 : 1;
     const oppositeColor = color ^ Piece.COLOR_MASK;
-    const grid = this.boardData.indexToGrid(startIndex);
-    // move 2
-    if (grid.gridY === startPawnIndex) {
-      const newY = grid.gridY + 2 * directionOffsetY;
-      const newY1 = grid.gridY + directionOffsetY;
-      const newX = grid.gridX;
-      if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
-        const targetIndex = newY * 8 + newX;
-        const middleIndex = newY1 * 8 + newX;
-        const enPassantTargetIndex = (newY - directionOffsetY) * 8 + newX;
-        if (0 <= targetIndex && targetIndex < 64) {
-          const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
-          const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
-          const pieceOnMiddleIndex = this.boardData.getPiece(middleIndex);
-          if (pieceOnTargetIndexColor === 0 && pieceOnMiddleIndex === 0) {
-            const newMove = new Move(
-              this.boardData,
+    const startRank = Math.floor(startIndex / ROW_CELLS);
+    const startFile = startIndex % ROW_CELLS;
+
+    const oneStepIndex = startIndex + directionOffsetY * ROW_CELLS;
+    if (0 <= oneStepIndex && oneStepIndex < 64) {
+      const pieceOnTargetIndex = this.boardData.getPiece(oneStepIndex);
+      if (pieceOnTargetIndex === Piece.None) {
+        this.addPawnMove(newMoves, startIndex, oneStepIndex, false, color);
+
+        if (startRank === startPawnRank) {
+          const twoStepIndex = startIndex + directionOffsetY * ROW_CELLS * 2;
+          if (
+            0 <= twoStepIndex &&
+            twoStepIndex < 64 &&
+            this.boardData.getPiece(twoStepIndex) === Piece.None
+          ) {
+            this.addPawnMove(
+              newMoves,
               startIndex,
-              targetIndex,
+              twoStepIndex,
               false,
+              color,
               undefined,
-              enPassantTargetIndex
+              oneStepIndex
             );
-            this.addMoveTo(newMove, newMoves);
           }
-        }
-      }
-    }
-    // move normal: 1
-    let newY = grid.gridY + directionOffsetY;
-    let newX = grid.gridX;
-    if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
-      const targetIndex = newY * 8 + newX;
-      if (0 <= targetIndex && targetIndex < 64) {
-        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
-        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
-        if (pieceOnTargetIndexColor === 0) {
-          const newMove = new Move(
-            this.boardData,
-            startIndex,
-            targetIndex,
-            false
-          );
-          this.addMoveTo(newMove, newMoves);
         }
       }
     }
 
-    // hit rule left
-    const directionsX = [-1, 1];
-    for (const dirX of directionsX) {
-      newY = grid.gridY + directionOffsetY;
-      newX = grid.gridX + dirX;
-      if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
-        const targetIndex = newY * 8 + newX;
-        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
-        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
-        if (pieceOnTargetIndexColor === oppositeColor) {
-          const newMove = new Move(
-            this.boardData,
+    const captureOffset = directionOffsetY * ROW_CELLS;
+    for (let fileDirection = -1; fileDirection <= 1; fileDirection += 2) {
+      const targetFile = startFile + fileDirection;
+      if (targetFile < 0 || targetFile >= ROW_CELLS) continue;
+
+      const targetIndex = startIndex + captureOffset + fileDirection;
+      if (targetIndex < 0 || targetIndex >= 64) continue;
+
+      const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
+      const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+      if (pieceOnTargetIndexColor === oppositeColor) {
+        this.addPawnMove(newMoves, startIndex, targetIndex, true, color);
+      } else if (pieceOnTargetIndex === Piece.None) {
+        const targetEnPIndex = startIndex + fileDirection;
+        const pieceEnPOnTargetIndex = this.boardData.getPiece(targetEnPIndex);
+        const pieceEnPOnTargetIndexColor =
+          pieceEnPOnTargetIndex & Piece.COLOR_MASK;
+        if (
+          pieceEnPOnTargetIndexColor === oppositeColor &&
+          this.boardData.isLegalEnPassant(targetEnPIndex, targetIndex)
+        ) {
+          this.addPawnMove(
+            newMoves,
             startIndex,
             targetIndex,
-            true
+            true,
+            color,
+            targetEnPIndex
           );
-          this.addMoveTo(newMove, newMoves);
-        } else if (pieceOnTargetIndexColor === 0) {
-          // check for en-passang
-          newY = grid.gridY;
-          newX = grid.gridX + dirX;
-          if (0 <= newY && newY < 8 && 0 <= newX && newX < 8) {
-            const targetEnPIndex = newY * 8 + newX;
-            const pieceEnPOnTargetIndex =
-              this.boardData.getPiece(targetEnPIndex);
-            const pieceEnPOnTargetIndexColor =
-              pieceEnPOnTargetIndex & Piece.COLOR_MASK;
-            if (pieceEnPOnTargetIndexColor === oppositeColor) {
-              if (this.boardData.isLegalEnPassant(targetEnPIndex, targetIndex)) {
-                const newMove = new Move(
-                  this.boardData,
-                  startIndex,
-                  targetIndex,
-                  true,
-                  targetEnPIndex
-                );
-                this.addMoveTo(newMove, newMoves);
-              }
-            }
-          }
         }
       }
     }
@@ -681,12 +637,12 @@ class LegalMoves {
   }
 
   removePseudoIllegalMovesForMyKing(color) {
-    const legalMovesForKing = this.getMovesFrom(
-      this.boardData.getKingPosition(color)
-    );
+    const kingIndex = this.boardData.getKingPosition(color);
     const opponentColor = color ^ Piece.COLOR_MASK;
     const movesToRemove = [];
-    for (const moveOfKing of legalMovesForKing) {
+    for (const moveOfKing of this.moves) {
+      if (moveOfKing.from !== kingIndex) continue;
+
       moveOfKing.makeMove();
       const kingInCheck = this.boardData.isIndexAttackedByColor(
         moveOfKing.to,
@@ -698,7 +654,13 @@ class LegalMoves {
       }
     }
     if (movesToRemove.length > 0) {
-      this.moves = this.moves.filter((x) => !x.isPartOf(movesToRemove));
+      const filteredMoves = [];
+      for (const move of this.moves) {
+        if (!move.isPartOf(movesToRemove)) {
+          filteredMoves.push(move);
+        }
+      }
+      this.moves = filteredMoves;
     }
   }
 
@@ -805,79 +767,52 @@ class LegalMoves {
     if (movesToCheck.length === 0) return;
     const color = movesToCheck[0].color;
     this.checkAttackIndexes = [];
+    const checkAttackLookup = [];
     for (const move of movesToCheck) {
-      this.checkAttackIndexes.push(...move.getIndexes());
+      const indexes = move.getIndexes();
+      for (let indexOffset = 0; indexOffset < indexes.length; indexOffset++) {
+        const attackIndex = indexes[indexOffset];
+        this.checkAttackIndexes.push(attackIndex);
+        checkAttackLookup[attackIndex] = true;
+      }
     }
-    let movesToKeep = [];
+    const movesToKeep = [];
     for (const move of this.moves) {
-      const canPreventCheck = this.checkAttackIndexes.includes(move.to);
+      const canPreventCheck = checkAttackLookup[move.to] === true;
       if (canPreventCheck && move.pieceOnly !== Piece.KING) {
         movesToKeep.push(move);
       }
     }
-    const movesOfTheKing = this.getMovesOfMyKing();
     verbose >= 2 && console.table(movesToKeep);
 
-    // check which are moves that are in attack by opponent
-    // opponent.to == movesOfTheKing.to
-    for (const moveOfKing of movesOfTheKing) {
+    for (const moveOfKing of this.moves) {
+      if (moveOfKing.pieceOnly !== Piece.KING) continue;
+
       const kingIsInCheckAndCastlingMove =
         moveOfKing.castlingKingTargetIndex &&
-        this.checkAttackIndexes.includes(moveOfKing.from);
-      if (!kingIsInCheckAndCastlingMove) {
-        const kingsTargetInAttackLineNotAllowed =
-          this.checkAttackIndexes.includes(moveOfKing.to);
-        if (!kingsTargetInAttackLineNotAllowed) {
-          for (const opponentMove of this.myLegalMoves(color).moves) {
-            if (moveOfKing.to !== opponentMove.from) {
-              if (
-                movesToKeep.find((x) => x.eqFromTo(moveOfKing)) === undefined
-              ) {
-                movesToKeep.push(moveOfKing);
-              }
-            }
-          }
-        } else if (moveOfKing.isHit) {
-          // check 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -  move the king
-          movesToKeep.push(moveOfKing);
-        }
-      } else {
+        checkAttackLookup[moveOfKing.from] === true;
+      if (kingIsInCheckAndCastlingMove) {
         verbose === 2 &&
           console.log(
             "Castling not allowed due because King " +
               moveOfKing.from +
               " is in check (remove pseudo illegal move)"
           );
+        continue;
+      }
+
+      moveOfKing.makeMove();
+      const kingInCheck = this.boardData.isIndexAttackedByColor(
+        moveOfKing.to,
+        color
+      );
+      moveOfKing.undoLastMove();
+      if (!kingInCheck) {
+        movesToKeep.push(moveOfKing);
       }
     }
-    // check if new opponent hits would check the king
-    const movesToKeepWithoutCheck = [];
-    for (const moveOfKing of movesToKeep) {
-      if (moveOfKing.pieceOnly === Piece.KING) {
-        this.boardData.setPieceInternal(moveOfKing.from, 0);
-        const oldTargetPiece = this.boardData.setPieceInternal(
-          moveOfKing.to,
-          moveOfKing.piece
-        );
-
-        let newMoves = this.boardData.opponentLegalMoves.generateMoves();
-        newMoves = newMoves.filter(
-          (x) => x.isHit && x.targetPieceOnly === Piece.KING
-        );
-        if (newMoves.length == 0) {
-          movesToKeepWithoutCheck.push(moveOfKing);
-        } else {
-          verbose === 2 && console.log("Remove move for king to go into check");
-        }
-
-        this.boardData.setPieceInternal(moveOfKing.from, moveOfKing.piece);
-        this.boardData.setPieceInternal(moveOfKing.to, oldTargetPiece);
-      } else {
-        movesToKeepWithoutCheck.push(moveOfKing);
-      }
-    }
-    verbose >= 2 && console.table(movesToKeepWithoutCheck);
-    this.moves = movesToKeepWithoutCheck;
+    verbose >= 2 && console.table(movesToKeep);
+    this.moves = movesToKeep;
   }
 }
 

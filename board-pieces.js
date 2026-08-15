@@ -19,6 +19,12 @@ const Piece = {
 };
 const MAX_DEPTH = 2;
 const SlidingPieces = [Piece.BISHOP, Piece.ROOK, Piece.QUEEN];
+const PromotionPieceTypes = [
+  Piece.QUEEN,
+  Piece.ROOK,
+  Piece.KNIGHT,
+  Piece.BISHOP,
+];
 
 const PieceNames = {
   0: "None",
