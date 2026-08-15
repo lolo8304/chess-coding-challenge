@@ -10,18 +10,29 @@ class TranspositionTable {
     // Default size is 2^20 entries
     this.table = new Array(size);
     this.size = size;
-    this.hits = 0;
-    this.misses = 0;
     this.filled = 0;
     this.filledExact = 0;
     this.overwritten = 0;
+    this.rejectedStores = 0;
+    this.probes = 0;
+    this.emptyMisses = 0;
+    this.hashCollisions = 0;
+    this.depthTooLow = 0;
+    this.depthHits = 0;
+    this.exactUsable = 0;
+    this.boundUsableCutoffs = 0;
+    this.boundNotUseful = 0;
+    this.bestMoveOrderingHits = 0;
   }
 
   printStats() {
-    const totalCalls = this.hits + this.misses;
-    const hitRatioPercent =
-      totalCalls === 0 ? 100 : Math.floor((this.hits * 100) / totalCalls);
-    const missesRatioPercent = 100 - hitRatioPercent;
+    const usable = this.exactUsable + this.boundUsableCutoffs;
+    const usableRatioPercent =
+      this.probes === 0 ? 100 : Math.floor((usable * 100) / this.probes);
+    const depthHitRatioPercent =
+      this.probes === 0
+        ? 100
+        : Math.floor((this.depthHits * 100) / this.probes);
     console.log(
       "Transposition stats: " +
         this.filled +
@@ -29,16 +40,32 @@ class TranspositionTable {
         this.filledExact +
         ", overwritten=" +
         this.overwritten +
+        ", rejectedStores=" +
+        this.rejectedStores +
         ", " +
-        hitRatioPercent +
-        "% hit (" +
-        this.hits +
+        depthHitRatioPercent +
+        "% depth-hit (" +
+        this.depthHits +
         "), " +
-        missesRatioPercent +
-        "% missed (" +
-        this.misses +
-        "), total calls=" +
-        totalCalls +
+        usableRatioPercent +
+        "% usable (" +
+        usable +
+        "), exactUsable=" +
+        this.exactUsable +
+        ", boundCutoffs=" +
+        this.boundUsableCutoffs +
+        ", boundNotUseful=" +
+        this.boundNotUseful +
+        ", empty=" +
+        this.emptyMisses +
+        ", collision=" +
+        this.hashCollisions +
+        ", depthTooLow=" +
+        this.depthTooLow +
+        ", bestMoveOrderingHits=" +
+        this.bestMoveOrderingHits +
+        ", total probes=" +
+        this.probes +
         ", "
     );
   }
@@ -52,38 +79,74 @@ class TranspositionTable {
   store(hash, depth, evaluation, flag, bestMove = undefined) {
     const index = this.getIndex(hash);
 
-    // Replace the entry if it's empty or if the new depth is greater
     const entry = this.table[index];
-    if (!entry || entry.depth <= depth) {
-      if (!entry) {
-        this.filled++;
-        if (flag === TranspositionFlag.EXACT) {
-          this.filledExact++;
-        }
-      } else {
-        this.overwritten++;
-      }
-      this.table[index] = {
-        hash,
-        depth,
-        evaluation,
-        flag,
-        bestMove,
-      };
+    if (!this.shouldReplace(entry, hash, depth, flag)) {
+      this.rejectedStores++;
+      return;
     }
+
+    if (!entry) {
+      this.filled++;
+    } else {
+      this.overwritten++;
+      if (entry.flag === TranspositionFlag.EXACT) {
+        this.filledExact--;
+      }
+    }
+    if (flag === TranspositionFlag.EXACT) {
+      this.filledExact++;
+    }
+
+    this.table[index] = {
+      hash,
+      depth,
+      evaluation,
+      flag,
+      bestMove,
+    };
+  }
+
+  shouldReplace(entry, hash, depth, flag) {
+    if (!entry) return true;
+    if (entry.hash !== hash) {
+      if (depth > entry.depth) return true;
+      if (depth === entry.depth && flag === TranspositionFlag.EXACT) return true;
+      return false;
+    }
+    if (depth > entry.depth) return true;
+    if (depth < entry.depth) return false;
+    if (flag === TranspositionFlag.EXACT) return true;
+    return entry.flag !== TranspositionFlag.EXACT;
   }
 
   retrieve(hash, requiredDepth) {
+    this.probes++;
     const index = this.getIndex(hash);
     const entry = this.table[index];
 
-    // Verify that the entry corresponds to the current hash and depth is sufficient
-    if (entry && entry.hash === hash && entry.depth >= requiredDepth) {
-      this.hits++;
-      return entry;
+    if (!entry) {
+      this.emptyMisses++;
+      return undefined;
     }
-    this.misses++;
-    return undefined; // No valid entry found or insufficient depth
+    if (entry.hash !== hash) {
+      this.hashCollisions++;
+      return undefined;
+    }
+    if (entry.depth < requiredDepth) {
+      this.depthTooLow++;
+      return undefined;
+    }
+    this.depthHits++;
+    return entry;
+  }
+
+  bestMoveForOrdering(hash) {
+    const entry = this.table[this.getIndex(hash)];
+    if (entry && entry.hash === hash && entry.bestMove) {
+      this.bestMoveOrderingHits++;
+      return entry.bestMove;
+    }
+    return undefined;
   }
 
   log(color, entry) {
@@ -114,6 +177,7 @@ class TranspositionTable {
       switch (entry.flag) {
         case "EXACT":
           // Exact evaluation: return the stored value
+          this.exactUsable++;
           this.log(color, entry)
           return {
             evaluation: entry.evaluation,
@@ -133,12 +197,14 @@ class TranspositionTable {
 
       // Prune the search if bounds overlap
       if (alpha >= beta) {
+        this.boundUsableCutoffs++;
         this.log(color, entry);
         return {
           evaluation: entry.evaluation,
           bestMove: entry.bestMove,
         };
       }
+      this.boundNotUseful++;
     }
 
     // No usable entry or search must continue
@@ -146,19 +212,15 @@ class TranspositionTable {
   }
 }
 
-let TranspositionTableSingleton = {};
+let TranspositionTableSingleton = undefined;
 
-function TranspositionTableInstance(color = "default") {
-  if (!TranspositionTableSingleton[color]) {
-    TranspositionTableSingleton[color] = new TranspositionTable();
+function TranspositionTableInstance() {
+  if (!TranspositionTableSingleton) {
+    TranspositionTableSingleton = new TranspositionTable();
   }
-  return TranspositionTableSingleton[color];
+  return TranspositionTableSingleton;
 }
-function TranspositionTableReset(color) {
-  if (arguments.length === 0) {
-    TranspositionTableSingleton = {};
-    return TranspositionTableInstance();
-  }
-  TranspositionTableSingleton[color] = undefined;
-  return TranspositionTableInstance(color);
+function TranspositionTableReset() {
+  TranspositionTableSingleton = undefined;
+  return TranspositionTableInstance();
 }

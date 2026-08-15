@@ -20,6 +20,11 @@
         padding: 10px;
       }
 
+      select {
+        font-size: 16px;
+        padding: 10px;
+      }
+
       canvas {
         display: block;
         -webkit-touch-callout: none;
@@ -79,8 +84,15 @@
               status === "ON" ? game.computerBlack.on().checkForAutoTurn() :  game.computerBlack.off()
           }
         }
+        function updateCalculationDepth(depth) {
+          setCalculationDepth(depth);
+        }
         document.addEventListener('DOMContentLoaded', function() {
             setupFen();
+            const calculationDepthElement = document.getElementById('calculationDepth');
+            if (calculationDepthElement) {
+              calculationDepthElement.value = getCalculationDepth();
+            }
         });
 
         function stats(depth, stat) {
@@ -134,6 +146,16 @@
           <a id="fenLibrary" style="display:none" href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
           &nbsp;Time: <span id="timeLastMove"></span>
           <button onclick="undoLastMove(); return false" type="button">Undo</button>
+          <label for="calculationDepth">Depth</label>
+          <select id="calculationDepth" onchange="updateCalculationDepth(this.value)">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+          </select>
         </form>
 
         <form id="computerForm" style="display: flex;padding:10px;">

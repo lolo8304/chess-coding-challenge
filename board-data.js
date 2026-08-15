@@ -467,9 +467,19 @@ class BoardData {
 
   getKingPosition(color) {
     const kingIndex = this.kingIndexes[color];
-    return kingIndex !== undefined
-      ? kingIndex
-      : this.anyOfPiece(Piece.KING | color);
+    const kingPiece = Piece.KING | color;
+    if (kingIndex !== undefined && this.squares[kingIndex] === kingPiece) {
+      return kingIndex;
+    }
+
+    for (let index = 0; index < this.squares.length; index++) {
+      if (this.squares[index] === kingPiece) {
+        this.kingIndexes[color] = index;
+        return index;
+      }
+    }
+    this.kingIndexes[color] = undefined;
+    return undefined;
   }
 
   isKingInCheck(color) {
@@ -477,6 +487,53 @@ class BoardData {
       this.getKingPosition(color),
       color ^ Piece.COLOR_MASK
     );
+  }
+
+  isKingMoveTargetAttacked(move, attackingColor) {
+    const squares = this.squares;
+    const previousKingIndex = this.kingIndexes[move.color];
+    const oldFromPiece = squares[move.from];
+    const oldToPiece = squares[move.to];
+    let attacked;
+
+    if (move.castlingKingTargetIndex) {
+      const rookStartIndex = move.castlingRookStartIndex;
+      const rookTargetIndex = move.castlingRookTargetIndex;
+      const oldRookStartPiece = squares[rookStartIndex];
+      const oldRookTargetPiece = squares[rookTargetIndex];
+      const rookPiece = squares[rookStartIndex];
+
+      try {
+        squares[move.from] = Piece.None;
+        if (rookStartIndex !== move.from) {
+          squares[rookStartIndex] = Piece.None;
+        }
+        squares[move.to] = move.piece;
+        squares[rookTargetIndex] = rookPiece;
+        this.kingIndexes[move.color] = move.to;
+
+        attacked = this.isIndexAttackedByColor(move.to, attackingColor);
+      } finally {
+        squares[move.from] = oldFromPiece;
+        squares[move.to] = oldToPiece;
+        squares[rookStartIndex] = oldRookStartPiece;
+        squares[rookTargetIndex] = oldRookTargetPiece;
+        this.kingIndexes[move.color] = previousKingIndex;
+      }
+    } else {
+      try {
+        squares[move.to] = move.piece;
+        squares[move.from] = Piece.None;
+        this.kingIndexes[move.color] = move.to;
+
+        attacked = this.isIndexAttackedByColor(move.to, attackingColor);
+      } finally {
+        squares[move.from] = oldFromPiece;
+        squares[move.to] = oldToPiece;
+        this.kingIndexes[move.color] = previousKingIndex;
+      }
+    }
+    return attacked;
   }
 
   isIndexAttackedByColor(targetIndex, attackingColor) {
