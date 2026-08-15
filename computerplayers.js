@@ -212,6 +212,16 @@ class Evaluator {
     this.opponentMaterialInfo = undefined;
     this.killerMoves = [];
     this.historyHeuristic = {};
+    this.searchStats = {
+      cutoffSources: {
+        ttBestMove: 0,
+        winningCapture: 0,
+        promotion: 0,
+        killer: 0,
+        history: 0,
+        other: 0,
+      },
+    };
   }
 
   evaluate(maximizingPlayer) {
@@ -426,6 +436,7 @@ class Evaluator {
         diffTime +
         " [ms]"
     );
+    this.printSearchStats();
     this.tt.printStats();
     return {
       bestMove: result.bestMove,
@@ -602,6 +613,7 @@ class Evaluator {
       if (beta <= alpha) {
         // move was too good, oppponent will avoid this posititon - snip
         totalCutOffs++;
+        this.recordCutoffSource(move);
         this.rememberCutoffMove(move, ply, depth);
         verbose === 1 &&
           console.log(
@@ -669,11 +681,37 @@ class Evaluator {
     };
   }
 
+  recordCutoffSource(move) {
+    const source = move.cutoffSource || "other";
+    this.searchStats.cutoffSources[source]++;
+  }
+
+  printSearchStats() {
+    const sources = this.searchStats.cutoffSources;
+    console.log(
+      "Cutoff sources: " +
+        "ttBestMove=" +
+        sources.ttBestMove +
+        ", winningCapture=" +
+        sources.winningCapture +
+        ", promotion=" +
+        sources.promotion +
+        ", killer=" +
+        sources.killer +
+        ", history=" +
+        sources.history +
+        ", other=" +
+        sources.other
+    );
+  }
+
   orderMoves(moves, ttBestMove = undefined, ply = 0) {
     for (const move of moves) {
       let moveScoreGuess = 0;
+      let cutoffSource = "other";
       if (ttBestMove && move.eqFromTo(ttBestMove)) {
         moveScoreGuess += 1000000000;
+        cutoffSource = "ttBestMove";
       }
       const movePieceType = move.pieceOnly;
       if (move.isHit) {
@@ -686,6 +724,9 @@ class Evaluator {
             getPieceTypeValue(movePieceType);
           if (captureDelta >= 0) {
             moveScoreGuess += 800000 + 10 * captureDelta;
+            if (cutoffSource === "other") {
+              cutoffSource = "winningCapture";
+            }
           } else {
             moveScoreGuess += 10000 + captureDelta;
           }
@@ -705,18 +746,29 @@ class Evaluator {
       // if promottion add promotion value
       if (move.promotionPiece != Piece.None) {
         moveScoreGuess += 700000 + getPieceTypeValue(move.promotionPiece);
+        if (cutoffSource === "other") {
+          cutoffSource = "promotion";
+        }
       }
       if (this.isKillerMove(move, ply)) {
         moveScoreGuess += 600000;
+        if (cutoffSource === "other") {
+          cutoffSource = "killer";
+        }
       }
       if (this.isQuietMove(move)) {
-        moveScoreGuess += this.historyHeuristic[this.moveKey(move)] || 0;
+        const historyScore = this.historyHeuristic[this.moveKey(move)] || 0;
+        moveScoreGuess += historyScore;
+        if (cutoffSource === "other" && historyScore > 0) {
+          cutoffSource = "history";
+        }
       }
       // penalize moving our pieces to a square attacked by an opponent pawn
       if (this.data.opponentPawnCanAttackIndex(move.color, move.to)) {
         moveScoreGuess -= getPieceTypeValue(movePieceType);
       }
       move.moveScoreGuess = moveScoreGuess;
+      move.cutoffSource = cutoffSource;
       //move.randomScoreGuess = Math.floor(Math.random() * 1000);
     }
     moves.sort((x, y) => {
