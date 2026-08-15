@@ -96,7 +96,21 @@ function reset() {
 }
 
 function clickedInCanvas(event) {
-  return game.clicked(event.clientY, event.clientX);
+  if (!event) {
+    return game.clicked(mouseY, mouseX);
+  }
+  const canvas = event?.currentTarget || event?.target || cnv?.elt;
+  if (!canvas?.getBoundingClientRect) {
+    return game.clicked(event.clientY ?? mouseY, event.clientX ?? mouseX);
+  }
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const canvasX =
+    event.clientX === undefined ? mouseX : (event.clientX - rect.left) * scaleX;
+  const canvasY =
+    event.clientY === undefined ? mouseY : (event.clientY - rect.top) * scaleY;
+  return game.clicked(canvasY, canvasX);
 }
 
 function undoLastMove() {
