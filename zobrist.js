@@ -10,57 +10,15 @@ if (typeof window === "undefined") {
     });
 }
 
-function createPRNG(seed) {
-  let state = seed || 29426028; // Default seed if none provided
-
-  // Returns a pseudo-random number between 0 and 2^32-1
-  return function () {
-    state ^= state << 13;
-    state ^= state >> 17;
-    state ^= state << 5;
-    return state >>> 0; // Ensure it's unsigned
-  };
-}
-const random = createPRNG();
-
 class Zobrist {
   constructor() {
-    // Random keys for pieces, castling rights, en passant, and side to move
-    this.zobristTable = this.initializeZobristTable();
-    this.castlingKeys = {
-      K: this.random64(),
-      Q: this.random64(),
-      k: this.random64(),
-      q: this.random64(),
-    };
-    this.enPassantKeys = Array.from({ length: 8 }, () => this.random64()); // 8 files (a-h)
-    this.sideToMoveKeyForBlack = this.random64(); // Toggles for side to move
-  }
-
-  // Generate a random 64-bit integer
-  random64() {
-    return (BigInt(random()) << 32n) | BigInt(random());
-  }
-
-  // Initialize the Zobrist table for pieces
-  initializeZobristTable() {
-    const pieceTypes = [
-      Piece.PAWN,
-      Piece.KNIGHT,
-      Piece.BISHOP,
-      Piece.ROOK,
-      Piece.QUEEN,
-      Piece.KING,
-    ];
-    const whitePieces = pieceTypes.map((x) => x | Piece.WHITE);
-    const blackPieces = pieceTypes.map((x) => x | Piece.BLACK);
-    const pieces = whitePieces.concat(blackPieces);
-    const squareCount = 64;
-    const table = [];
-    for (const piece of pieces) {
-      table[piece] = Array.from({ length: squareCount }, () => this.random64());
+    if (typeof ZOBRIST_KEYS === "undefined") {
+      throw new Error("zobrist-keys.js must be loaded before zobrist.js");
     }
-    return table;
+    this.zobristTable = ZOBRIST_KEYS.zobristTable;
+    this.castlingKeys = ZOBRIST_KEYS.castlingKeys;
+    this.enPassantKeys = ZOBRIST_KEYS.enPassantKeys;
+    this.sideToMoveKeyForBlack = ZOBRIST_KEYS.sideToMoveKeyForBlack;
   }
 
   // Compute the initial Zobrist hash for a board position
