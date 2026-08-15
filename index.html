@@ -55,7 +55,7 @@
     <script src="zobrist.js"></script>
     <script src="bit-board.js"></script>
     <script src="transposition-table.js"></script>
-    <script src="alpha-beta.js"></script>
+    <!--script src="alpha-beta.js"></script-->
     <script src="board-data.js"></script>
     <script src="board-moves.js"></script>
     <script src="history.js"></script>
@@ -63,8 +63,8 @@
     <script src="computerplayers.js"></script>
     <script>
         function handleSubmit(event) {
-            event.preventDefault(); 
-            const fenValue = document.getElementById('fen').value; 
+            event.preventDefault();
+            const fenValue = document.getElementById('fen').value;
             if (fenValue) {
               window.location.hash = fenValue
               window.location.reload();
@@ -84,7 +84,7 @@
         });
 
         function stats(depth, stat) {
-          setTimeout(function stats2() { 
+          setTimeout(function stats2() {
             const testMovesResults = document.getElementById('testMovesResults');
             testMovesResults.innerHTML = testMovesResults.innerHTML + "<br>"+depth+": "+stat
           }, 100);
@@ -96,7 +96,7 @@
             const testMovesResults = document.getElementById('testMovesResults');
             testMovesResults.innerHTML = ""
             testMovesElement.setAttribute("style", "display:none");
-            setTimeout(function test() { 
+            setTimeout(function test() {
               testMoves(stats)
               testMovesElement.setAttribute("style", "display:")
             }, 100);
@@ -148,7 +148,7 @@
                   OFF
               </label>
           </fieldset>
-  
+
           <fieldset class="computer-switcher">
               <legend>BLACK computer</legend>
               <label>
