@@ -84,11 +84,32 @@ let LAST_MOVE_COLOR;
 //                       N   S  W  O  NW SE  NO  SW
 directionOffsets = [-8, 8, -1, 1, -9, 9, -7, 7];
 distanceToEdge = [];
+rayTargets = [];
+knightAttackTargets = [];
+kingAttackTargets = [];
+pawnAttackersByColor = {};
+const knightGridOffsets = [
+  [-2, -1],
+  [-2, 1],
+  [2, -1],
+  [2, 1],
+  [-1, -2],
+  [-1, 2],
+  [1, -2],
+  [1, 2],
+];
 
 const prepareDirectionOffsets = () => {
   const checkBoardToEdges = (distanceToEdgeCount) => {
     if (distanceToEdgeCount === 0) return undefined;
     return distanceToEdgeCount;
+  };
+  rayTargets = [];
+  knightAttackTargets = [];
+  kingAttackTargets = [];
+  pawnAttackersByColor = {
+    [Piece.WHITE]: [],
+    [Piece.BLACK]: [],
   };
   for (let gridY = 0; gridY < ROW_CELLS; gridY++) {
     for (let gridX = 0; gridX < ROW_CELLS; gridX++) {
@@ -112,6 +133,69 @@ const prepareDirectionOffsets = () => {
         checkBoardToEdges(NE),
         checkBoardToEdges(SW),
       ];
+
+      rayTargets[index] = [];
+      for (
+        let directionIndex = 0;
+        directionIndex < directionOffsets.length;
+        directionIndex++
+      ) {
+        const ray = [];
+        const distanceToTarget = distanceToEdge[index][directionIndex];
+        const maxDistance =
+          distanceToTarget < 0 ? -distanceToTarget : distanceToTarget || 0;
+        const directionOffset = directionOffsets[directionIndex];
+        for (let distance = 1; distance <= maxDistance; distance++) {
+          ray.push(index + directionOffset * distance);
+        }
+        rayTargets[index][directionIndex] = ray;
+      }
+
+      const knightTargets = [];
+      for (const [dy, dx] of knightGridOffsets) {
+        const targetY = gridY + dy;
+        const targetX = gridX + dx;
+        if (0 <= targetY && targetY < 8 && 0 <= targetX && targetX < 8) {
+          knightTargets.push(targetY * 8 + targetX);
+        }
+      }
+      knightAttackTargets[index] = knightTargets;
+
+      const kingTargets = [];
+      const minKingTargetY = Math.max(0, gridY - 1);
+      const maxKingTargetY = Math.min(7, gridY + 1);
+      const minKingTargetX = Math.max(0, gridX - 1);
+      const maxKingTargetX = Math.min(7, gridX + 1);
+      for (
+        let targetY = minKingTargetY;
+        targetY <= maxKingTargetY;
+        targetY++
+      ) {
+        for (
+          let targetX = minKingTargetX;
+          targetX <= maxKingTargetX;
+          targetX++
+        ) {
+          if (targetY !== gridY || targetX !== gridX) {
+            kingTargets.push(targetY * 8 + targetX);
+          }
+        }
+      }
+      kingAttackTargets[index] = kingTargets;
+
+      const whitePawnAttackers = [];
+      if (gridY < 7) {
+        if (gridX > 0) whitePawnAttackers.push(index + 7);
+        if (gridX < 7) whitePawnAttackers.push(index + 9);
+      }
+      pawnAttackersByColor[Piece.WHITE][index] = whitePawnAttackers;
+
+      const blackPawnAttackers = [];
+      if (gridY > 0) {
+        if (gridX > 0) blackPawnAttackers.push(index - 9);
+        if (gridX < 7) blackPawnAttackers.push(index - 7);
+      }
+      pawnAttackersByColor[Piece.BLACK][index] = blackPawnAttackers;
     }
   }
 };

@@ -303,10 +303,10 @@ class LegalMoves {
   generateMoves(color) {
     color = color || this.color;
     const newMoves = [];
-    const pieces = this.boardData.getPiecesCacheByColor(color); // [ {piece: <int>, indexes: [ int, int ]} ]
-    for (const pieceAndIndexes of pieces) {
-      for (const index of pieceAndIndexes.indexes) {
-        const piece = pieceAndIndexes.piece;
+    for (let pieceOnly = Piece.KING; pieceOnly <= Piece.QUEEN; pieceOnly++) {
+      const piece = pieceOnly | color;
+      const indexes = this.boardData.getPiecesCache(piece);
+      for (const index of indexes) {
         this.generateMoveForPieceFromIndex(newMoves, index, piece, color);
       }
     }
@@ -656,37 +656,26 @@ class LegalMoves {
       directionIndex < endDirIndex;
       directionIndex++
     ) {
-      const distanceToTarget = distanceToEdge[startIndex][directionIndex];
-      if (distanceToTarget) {
-        let n = 0;
-        const inc = Math.sign(distanceToTarget);
-        do {
-          const targetIndex =
-            startIndex + directionOffsets[directionIndex] * (Math.abs(n) + 1);
-          if (0 <= targetIndex && targetIndex < 64) {
-            const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
-            const pieceOnTargetIndexColor =
-              pieceOnTargetIndex & Piece.COLOR_MASK;
-            if (pieceOnTargetIndexColor === color) {
-              break;
-            }
-            if (pieceOnTargetIndexColor === oppositeColor) {
-              this.addMoveTo(
-                new Move(this.boardData, startIndex, targetIndex, true),
-                newMoves
-              );
-              break;
-            } else {
-              this.addMoveTo(
-                new Move(this.boardData, startIndex, targetIndex, false),
-                newMoves
-              );
-            }
-          } else {
-            break;
-          }
-          n = n + inc;
-        } while (inc === 1 ? n < distanceToTarget : n > distanceToTarget);
+      const ray = rayTargets[startIndex][directionIndex];
+      for (let rayIndex = 0; rayIndex < ray.length; rayIndex++) {
+        const targetIndex = ray[rayIndex];
+        const pieceOnTargetIndex = this.boardData.getPiece(targetIndex);
+        const pieceOnTargetIndexColor = pieceOnTargetIndex & Piece.COLOR_MASK;
+        if (pieceOnTargetIndexColor === color) {
+          break;
+        }
+        if (pieceOnTargetIndexColor === oppositeColor) {
+          this.addMoveTo(
+            new Move(this.boardData, startIndex, targetIndex, true),
+            newMoves
+          );
+          break;
+        } else {
+          this.addMoveTo(
+            new Move(this.boardData, startIndex, targetIndex, false),
+            newMoves
+          );
+        }
       }
     }
   }
@@ -696,6 +685,7 @@ class LegalMoves {
       this.boardData.getKingPosition(color)
     );
     const opponentColor = color ^ Piece.COLOR_MASK;
+    const movesToRemove = [];
     for (const moveOfKing of legalMovesForKing) {
       moveOfKing.makeMove();
       const kingInCheck = this.boardData.isIndexAttackedByColor(
@@ -704,8 +694,11 @@ class LegalMoves {
       );
       moveOfKing.undoLastMove();
       if (kingInCheck) {
-        this.moves = this.moves.filter((x) => !x.eqFromTo(moveOfKing));
+        movesToRemove.push(moveOfKing);
       }
+    }
+    if (movesToRemove.length > 0) {
+      this.moves = this.moves.filter((x) => !x.isPartOf(movesToRemove));
     }
   }
 
@@ -714,27 +707,37 @@ class LegalMoves {
   limitingMovementPinnedPieces() {
     const pinnedPieces = this.findPinnedPieces();
     this.checkAttackOnPinnedPieces = [];
-
-    this.moves = this.moves.filter((move) => {
-      if (move.pieceOnly === Piece.KING) return true;
+    const filteredMoves = [];
+    for (const move of this.moves) {
+      if (move.pieceOnly === Piece.KING) {
+        filteredMoves.push(move);
+        continue;
+      }
 
       if (move.enPassant) {
         const keepMove = !this.moveExposesKing(move);
         if (!keepMove) {
           this.checkAttackOnPinnedPieces.push(move.from, move.to);
+        } else {
+          filteredMoves.push(move);
         }
-        return keepMove;
+        continue;
       }
 
       const pinnedPiece = pinnedPieces[move.from];
-      if (!pinnedPiece) return true;
+      if (!pinnedPiece) {
+        filteredMoves.push(move);
+        continue;
+      }
 
-      const keepMove = pinnedPiece.allowedTargetIndexes.includes(move.to);
+      const keepMove = pinnedPiece.allowedTargetIndexes[move.to] === true;
       if (!keepMove) {
         this.checkAttackOnPinnedPieces.push(...pinnedPiece.attackLine);
+      } else {
+        filteredMoves.push(move);
       }
-      return keepMove;
-    });
+    }
+    this.moves = filteredMoves;
   }
 
   moveExposesKing(move) {
@@ -753,16 +756,12 @@ class LegalMoves {
       directionIndex < directionOffsets.length;
       directionIndex++
     ) {
-      const distanceToTarget = distanceToEdge[kingIndex][directionIndex];
-      if (!distanceToTarget) continue;
-
-      const directionOffset = directionOffsets[directionIndex];
-      const maxDistance = Math.abs(distanceToTarget);
+      const ray = rayTargets[kingIndex][directionIndex];
       const attackLine = [];
       let pinnedIndex = undefined;
 
-      for (let distance = 1; distance <= maxDistance; distance++) {
-        const index = kingIndex + directionOffset * distance;
+      for (let rayIndex = 0; rayIndex < ray.length; rayIndex++) {
+        const index = ray[rayIndex];
         attackLine.push(index);
         const piece = this.boardData.getPiece(index);
         if (piece === Piece.None) continue;
@@ -778,8 +777,12 @@ class LegalMoves {
           pinnedIndex !== undefined &&
           this.isSlidingAttackOnDirection(piece, directionIndex)
         ) {
+          const allowedTargetIndexes = {};
+          for (const target of attackLine) {
+            allowedTargetIndexes[target] = true;
+          }
           pinnedPieces[pinnedIndex] = {
-            allowedTargetIndexes: attackLine.slice(),
+            allowedTargetIndexes,
             attackLine: attackLine.slice(),
           };
         }

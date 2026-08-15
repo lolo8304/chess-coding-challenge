@@ -22,6 +22,7 @@ class BoardData {
     };
     this.squares = new Array(64).fill(0);
     this.piecesCache = {};
+    this.kingIndexes = {};
     this.selectedIndex = NOT_SELECTED;
     this.halfMoveCounter = 0;
     this.nextFullMoveCounter = 1;
@@ -109,6 +110,7 @@ class BoardData {
     this.checkPiece(piece);
     this.squares[index] = piece;
     this.updatePiecesCache(index, oldPiece, piece);
+    this.updateKingIndexes(index, oldPiece, piece);
     return oldPiece;
   }
 
@@ -126,13 +128,16 @@ class BoardData {
 
   updatePiecesCache(index, oldPiece, piece) {
     if (oldPiece > 0) {
-      let indexesPerPiece = this.piecesCache[oldPiece];
+      const indexesPerPiece = this.piecesCache[oldPiece];
       if (indexesPerPiece === undefined) {
         this.piecesCache[oldPiece] = [];
       } else {
-        this.piecesCache[oldPiece] = indexesPerPiece.filter(
-          (item) => item !== index
-        );
+        const itemIndex = indexesPerPiece.indexOf(index);
+        if (itemIndex !== -1) {
+          indexesPerPiece[itemIndex] =
+            indexesPerPiece[indexesPerPiece.length - 1];
+          indexesPerPiece.pop();
+        }
       }
     }
     if (piece > 0) {
@@ -142,6 +147,19 @@ class BoardData {
       } else {
         this.piecesCache[piece].push(index);
       }
+    }
+  }
+
+  updateKingIndexes(index, oldPiece, piece) {
+    if ((piece & Piece.PIECES_MASK) === Piece.KING) {
+      this.kingIndexes[piece & Piece.COLOR_MASK] = index;
+    }
+
+    if (
+      (oldPiece & Piece.PIECES_MASK) === Piece.KING &&
+      this.kingIndexes[oldPiece & Piece.COLOR_MASK] === index
+    ) {
+      this.kingIndexes[oldPiece & Piece.COLOR_MASK] = undefined;
     }
   }
 
@@ -361,6 +379,28 @@ class BoardData {
     return newLegalMove;
   }
 
+  setLegalMovesForPerft(color) {
+    const legalMoves = this.newLegalMovesForPerft(color);
+    this.legalMoves = legalMoves;
+    return legalMoves;
+  }
+
+  newLegalMovesForPerft(color) {
+    const legalMoves = new LegalMoves(color, this);
+    const pseudoMoves = legalMoves.generateMoves(color);
+    const filteredMoves = [];
+    for (const move of pseudoMoves) {
+      move.makeMove();
+      const isLegal = !this.isKingInCheck(color);
+      move.undoLastMove();
+      if (isLegal) {
+        filteredMoves.push(move);
+      }
+    }
+    legalMoves.moves = filteredMoves;
+    return legalMoves;
+  }
+
   indexToGrid(index) {
     return {
       gridY: Math.floor(index / ROW_CELLS),
@@ -426,7 +466,10 @@ class BoardData {
   }
 
   getKingPosition(color) {
-    return this.anyOfPiece(Piece.KING | color);
+    const kingIndex = this.kingIndexes[color];
+    return kingIndex !== undefined
+      ? kingIndex
+      : this.anyOfPiece(Piece.KING | color);
   }
 
   isKingInCheck(color) {
@@ -437,49 +480,27 @@ class BoardData {
   }
 
   isIndexAttackedByColor(targetIndex, attackingColor) {
-    const targetGrid = this.indexToGrid(targetIndex);
-
-    const pawnDirection = (attackingColor & Piece.WHITE) > 0 ? -1 : 1;
-    for (const pawnIndex of this.getPiecesCache(Piece.PAWN | attackingColor)) {
-      const pawnGrid = this.indexToGrid(pawnIndex);
-      if (
-        pawnGrid.gridY + pawnDirection === targetGrid.gridY &&
-        Math.abs(pawnGrid.gridX - targetGrid.gridX) === 1
-      ) {
+    const squares = this.squares;
+    const pawnPiece = Piece.PAWN | attackingColor;
+    const pawnAttackers = pawnAttackersByColor[attackingColor][targetIndex];
+    for (let i = 0; i < pawnAttackers.length; i++) {
+      if (squares[pawnAttackers[i]] === pawnPiece) {
         return true;
       }
     }
 
-    const knightOffsets = [
-      [-2, -1],
-      [-2, 1],
-      [2, -1],
-      [2, 1],
-      [-1, -2],
-      [-1, 2],
-      [1, -2],
-      [1, 2],
-    ];
-    for (const [dy, dx] of knightOffsets) {
-      const grid = {
-        gridY: targetGrid.gridY + dy,
-        gridX: targetGrid.gridX + dx,
-      };
-      if (
-        this.isValidGrid(grid) &&
-        this.getPiece(grid.gridY * 8 + grid.gridX) ===
-          (Piece.KNIGHT | attackingColor)
-      ) {
+    const knightPiece = Piece.KNIGHT | attackingColor;
+    const knightTargets = knightAttackTargets[targetIndex];
+    for (let i = 0; i < knightTargets.length; i++) {
+      if (squares[knightTargets[i]] === knightPiece) {
         return true;
       }
     }
 
-    for (const kingIndex of this.getPiecesCache(Piece.KING | attackingColor)) {
-      const kingGrid = this.indexToGrid(kingIndex);
-      if (
-        Math.abs(kingGrid.gridY - targetGrid.gridY) <= 1 &&
-        Math.abs(kingGrid.gridX - targetGrid.gridX) <= 1
-      ) {
+    const kingPiece = Piece.KING | attackingColor;
+    const kingTargets = kingAttackTargets[targetIndex];
+    for (let i = 0; i < kingTargets.length; i++) {
+      if (squares[kingTargets[i]] === kingPiece) {
         return true;
       }
     }
@@ -489,15 +510,11 @@ class BoardData {
       directionIndex < directionOffsets.length;
       directionIndex++
     ) {
-      const distanceToTarget = distanceToEdge[targetIndex][directionIndex];
       const isOrthogonal = directionIndex < 4;
-      for (
-        let distance = 1;
-        distance <= Math.abs(distanceToTarget);
-        distance++
-      ) {
-        const index = targetIndex + directionOffsets[directionIndex] * distance;
-        const piece = this.getPiece(index);
+      const ray = rayTargets[targetIndex][directionIndex];
+      for (let distance = 0; distance < ray.length; distance++) {
+        const index = ray[distance];
+        const piece = squares[index];
         if (piece === Piece.None) continue;
 
         const pieceColor = piece & Piece.COLOR_MASK;
@@ -606,6 +623,18 @@ class BoardData {
     return numPositions;
   }
 
+  testMovesNodesOnly(maxDepth) {
+    const oldVerbose = verbose;
+    verbose = 0;
+    const nodes = new MoveGeneratorNodesOnly(
+      this,
+      this.legalMoves.color,
+      maxDepth
+    ).testMoves(maxDepth);
+    verbose = oldVerbose;
+    return new MoveGeneratorStats(nodes);
+  }
+
   opponentPawnCanAttackIndex(color, targetIndex) {
     const directionOffsetY = (color & Piece.WHITE) > 0 ? -1 : 1;
     const opponentPawnPieceIndexes = this.getPiecesCache(
@@ -710,6 +739,8 @@ class MoveGeneratorTest {
     let numPositions = new MoveGeneratorStats();
     //depth > 0 && console.log("  ".repeat(depth) + depth + " Test for " + moves.length + " moves");
     for (const move of moves) {
+      const rootMoveStartTime =
+        depth === this.maxDepth ? performance.now() : undefined;
       this.data.makeMove(move, false);
       const newColor = move.color ^ Piece.COLOR_MASK;
       this.data.setLegalMovesFor(newColor);
@@ -719,8 +750,22 @@ class MoveGeneratorTest {
       const inc = this.testMoves(depth - 1, move);
       numPositions.add(inc);
 
-      depth === this.maxDepth &&
-        console.log(move.toCoordinateNotation() + ": " + inc);
+      if (depth === this.maxDepth) {
+        const rootMoveElapsedMs =
+          Math.round((performance.now() - rootMoveStartTime) * 10) / 10;
+        const rootMoveNps = Math.round(
+          (inc.nodes / Math.max(rootMoveElapsedMs, 0.001)) * 1000
+        );
+        console.log(
+          move.toCoordinateNotation() +
+            ": " +
+            inc +
+            ", time=" +
+            rootMoveElapsedMs +
+            " ms, nps=" +
+            rootMoveNps
+        );
+      }
 
       this.data.undoMove(move);
       this.data.setLegalMovesFor(move.color);
@@ -731,10 +776,66 @@ class MoveGeneratorTest {
   }
 }
 
+class MoveGeneratorNodesOnly {
+  constructor(data, color, maxDepth) {
+    this.data = data;
+    this.color = color;
+    this.maxDepth = maxDepth;
+  }
+
+  testMoves(depth) {
+    if (depth === 0) {
+      return 1;
+    }
+    if (depth === 1) {
+      return this.data.legalMoves.moves.length;
+    }
+
+    const moves = [...this.data.legalMoves.moves];
+    let nodes = 0;
+    for (const move of moves) {
+      const rootMoveStartTime =
+        depth === this.maxDepth ? performance.now() : undefined;
+      this.data.makeMove(move, false);
+      const newColor = move.color ^ Piece.COLOR_MASK;
+      this.data.setLegalMovesForPerft(newColor);
+      game.color = newColor;
+      redraw();
+
+      const inc = this.testMoves(depth - 1);
+      nodes += inc;
+
+      if (depth === this.maxDepth) {
+        const rootMoveElapsedMs =
+          Math.round((performance.now() - rootMoveStartTime) * 10) / 10;
+        const rootMoveNps = Math.round(
+          (inc / Math.max(rootMoveElapsedMs, 0.001)) * 1000
+        );
+        console.log(
+          move.toCoordinateNotation() +
+            ": Nodes=" +
+            inc +
+            ", time=" +
+            rootMoveElapsedMs +
+            " ms, nps=" +
+            rootMoveNps
+        );
+      }
+
+      this.data.undoMove(move);
+      this.data.setLegalMovesForPerft(move.color);
+      game.color = move.color;
+      redraw();
+    }
+    return nodes;
+  }
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     BoardData,
     MoveGeneratorStats,
     MoveGeneratorTest,
+    MoveGeneratorNodesOnly,
   };
 }
