@@ -23,6 +23,7 @@ if ! [[ "$max_depth" =~ ^[0-9]+$ ]] || [ "$max_depth" -lt 1 ]; then
   echo "  $0 2 '' 10" >&2
   echo "  $0 2 chess960 10-" >&2
   echo "  $0 2 chess960 10-20" >&2
+  echo "  $0 2 chess960 random-25" >&2
   exit 1
 fi
 
@@ -78,39 +79,71 @@ function expectedEntries(expected) {
 }
 
 const cases = fixture.cases || [];
-let selectedCases = caseFilter
+let selectedCases = (caseFilter
   ? cases.filter((testCase) => testCase.name.includes(caseFilter))
-  : cases;
+  : cases
+).map((testCase) => ({
+  ...testCase,
+  fixtureIndex: cases.indexOf(testCase) + 1,
+}));
 
 function parseCaseRange(value, total) {
-  if (!value) return { start: 1, end: total };
+  if (!value) return { type: "range", start: 1, end: total };
 
-  let match = value.match(/^(\d+)$/);
+  let match = value.match(/^random-(\d+)$/);
   if (match) {
-    return { start: 1, end: Number(match[1]) };
+    return { type: "random", count: Number(match[1]) };
+  }
+
+  match = value.match(/^(\d+)$/);
+  if (match) {
+    return { type: "range", start: 1, end: Number(match[1]) };
   }
 
   match = value.match(/^(\d+)-$/);
   if (match) {
-    return { start: Number(match[1]), end: total };
+    return { type: "range", start: Number(match[1]), end: total };
   }
 
   match = value.match(/^(\d+)-(\d+)$/);
   if (match) {
-    return { start: Number(match[1]), end: Number(match[2]) };
+    return { type: "range", start: Number(match[1]), end: Number(match[2]) };
   }
 
   throw new Error(
-    "Invalid case range. Use N, N-, or N-M, for example 10, 10-, or 10-20."
+    "Invalid case range. Use N, N-, N-M, or random-N, for example 10, 10-, 10-20, or random-25."
   );
 }
 
+let selectionLabel = caseRange ? "Range: " + caseRange : "";
 try {
-  const { start, end } = parseCaseRange(caseRange, selectedCases.length);
-  if (start < 1 || end < start) {
-    throw new Error("Invalid case range bounds.");
+  const selection = parseCaseRange(caseRange, selectedCases.length);
+  if (selection.type === "random") {
+    if (selection.count < 1) {
+      throw new Error("Random case count must be at least 1.");
+    }
+    const maxStart = Math.max(1, selectedCases.length - selection.count + 1);
+    const start = Math.floor(Math.random() * maxStart) + 1;
+    const end = Math.min(selectedCases.length, start + selection.count - 1);
+    selectedCases = selectedCases.slice(start - 1, end);
+    selectionLabel =
+      "Random: " +
+      selectedCases.length +
+      " requested=" +
+      selection.count +
+      " start=" +
+      start +
+      " end=" +
+      end +
+      " from=" +
+      (caseFilter ? "filtered" : "all");
+  } else {
+    const { start, end } = selection;
+    if (start < 1 || end < start) {
+      throw new Error("Invalid case range bounds.");
+    }
+    selectedCases = selectedCases.slice(start - 1, end);
   }
-  selectedCases = selectedCases.slice(start - 1, end);
 } catch (error) {
   console.error(error.message);
   process.exit(1);
@@ -128,11 +161,12 @@ console.log("Perft Regression Suite (max depth " + maxDepth + ")");
 console.log("Fixture: " + fixtureJson);
 console.log("Cases: " + selectedCases.length + " / " + cases.length);
 if (caseFilter) console.log("Filter: " + caseFilter);
-if (caseRange) console.log("Range: " + caseRange);
+if (selectionLabel) console.log(selectionLabel);
 
 let i = 0;
 for (const testCase of selectedCases) {
   i++;
+  const caseStartTime = process.hrtime.bigint();
   const expectations = testCase.expectations || testCase.depths || [];
   const depths = expectations.filter((expected) => expected.depth <= maxDepth);
   if (depths.length === 0) continue;
@@ -154,12 +188,35 @@ for (const testCase of selectedCases) {
     const detail = mismatches
       .map(([key, value]) => key + ": expected " + value + ", got " + actual[key])
       .join("; ");
-    console.log(i+": FAIL " + testCase.name + " depth " + expected.depth + ": " + detail);
-    console.log(i+": FEN: " + testCase.fen);
+    console.log(
+      i +
+        " [" +
+        testCase.fixtureIndex +
+        "]: FAIL " +
+        testCase.name +
+        " depth " +
+        expected.depth +
+        ": " +
+        detail
+    );
+    console.log(i + " [" + testCase.fixtureIndex + "]: FEN: " + testCase.fen);
   }
 
+  const caseElapsedMs =
+    Math.round((Number(process.hrtime.bigint() - caseStartTime) / 1e6) * 10) /
+    10;
   if (failures === 0) {
-    console.log(i+": OK   " + testCase.name + " " + results.join(" "));
+    console.log(
+      i +
+        " [" +
+        testCase.fixtureIndex +
+        "]: OK   " +
+        testCase.name +
+        " time=" +
+        caseElapsedMs +
+        "ms " +
+        results.join(" ")
+    );
   }
 }
 
