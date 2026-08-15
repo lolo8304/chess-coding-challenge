@@ -102,7 +102,7 @@ class Game {
     }
   }
 
-  makeTurnAndCalculate(depth) {
+  makeTurnAndCalculate(depth, runComputerNow = true) {
     this.changeTurn();
     this.board.data.setLegalMovesFor(this.color);
     const fen = this.board.data.calculatedFen();
@@ -111,12 +111,17 @@ class Game {
       fenHTML.value = fen;
       window.location.hash = fen;
     }
-    this.computerMove(undefined, depth + 1);
+    if (runComputerNow) {
+      this.computerMove(undefined, depth + 1);
+    } else {
+      this.computerMove(undefined, 2);
+      this.time = 1.01;
+    }
   }
 
-  makeMove(move, depth) {
+  makeMove(move, depth, runComputerNow = true) {
     this.board.makeMove(move, true);
-    this.makeTurnAndCalculate(depth);
+    this.makeTurnAndCalculate(depth, runComputerNow);
   }
 
   setTimeLastMove(startTime) {
@@ -139,7 +144,7 @@ class Game {
         selectedIndex
       );
       if (clickedCell && clickedCell.index != selectedIndex && validMove) {
-        this.makeMove(validMove, 0);
+        this.makeMove(validMove, 0, false);
       } else {
         this.board.selectCellIndex(NOT_SELECTED);
         this.board.data.setLegalMovesFor(this.color);
