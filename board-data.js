@@ -843,7 +843,7 @@ class BoardData {
     this.nextFullMoveCounter = Math.floor(this.halfMoveCounter / 2) + 1;
   }
   isFinished() {
-    return this.result != undefined;
+    return this.result !== undefined || game.remainingMilliseconds(Piece.BLACK) <= 0 || game.remainingMilliseconds(Piece.WHITE) <= 0;
   }
   isNotFinished() {
     return this.result === undefined;

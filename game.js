@@ -71,6 +71,14 @@ class Game {
     }
     if (this.board.data.isFinished()) {
       turnText = this.board.data.result;
+      if (this.color === Piece.WHITE && this.remainingMilliseconds(Piece.WHITE) === 0) {
+        turnText = "BLACK won - timeout";
+      }
+      if (this.color === Piece.BLACK && this.remainingMilliseconds(Piece.BLACK) === 0) {
+        turnText = "WHITE won - timeout";
+      }
+    }
+    if (this.board.data.isFinished()) {
       fill("red");
       rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
     }
