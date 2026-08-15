@@ -7,16 +7,20 @@ const START_FEN =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 function usage() {
-  console.error('Usage: node perft.js [--profile] <depth> "<fen>"');
+  console.error('Usage: node perft.js [--profile] [--nodes-only] <depth> "<fen>"');
   console.error(`Example: node perft.js 3 "${START_FEN}"`);
   console.error(`Example: node perft.js --profile 3 "${START_FEN}"`);
+  console.error(`Example: node perft.js --nodes-only 3 "${START_FEN}"`);
   process.exit(1);
 }
 
 function getCommandLineArguments() {
   const args = process.argv.slice(2);
   const profile = args.includes("--profile");
-  const positionalArgs = args.filter((arg) => arg !== "--profile");
+  const nodesOnly = args.includes("--nodes-only");
+  const positionalArgs = args.filter(
+    (arg) => arg !== "--profile" && arg !== "--nodes-only"
+  );
 
   if (positionalArgs.length < 1 || positionalArgs.length > 2) {
     usage();
@@ -30,7 +34,7 @@ function getCommandLineArguments() {
     usage();
   }
 
-  return { depth, fen, profile };
+  return { depth, fen, profile, nodesOnly };
 }
 
 function createEngineContext() {
@@ -122,6 +126,7 @@ function installProfiler(context) {
       };
 
       perftProfiler.wrap(BoardData.prototype, "setLegalMovesFor", "BoardData.setLegalMovesFor");
+      perftProfiler.wrap(BoardData.prototype, "setLegalMovesForPerft", "BoardData.setLegalMovesForPerft");
       perftProfiler.wrap(BoardData.prototype, "makeMove", "BoardData.makeMove");
       perftProfiler.wrap(BoardData.prototype, "undoMove", "BoardData.undoMove");
       perftProfiler.wrap(BoardData.prototype, "isIndexAttackedByColor", "BoardData.isIndexAttackedByColor");
@@ -135,20 +140,29 @@ function installProfiler(context) {
   );
 }
 
-function runPerft(context, depth, fen, profile) {
+function runPerft(context, depth, fen, profile, nodesOnly) {
   context.perftDepth = depth;
   context.perftFen = fen;
   context.perftProfile = profile;
+  context.perftNodesOnly = nodesOnly;
 
   return vm.runInContext(
     `
       const data = new BoardData(new History(), perftFen);
       game.color = data.legalMoves.color;
-      data.setLegalMovesFor(game.color);
+      if (perftNodesOnly) {
+        data.setLegalMovesForPerft(game.color);
+      } else {
+        data.setLegalMovesFor(game.color);
+      }
 
       const startTime = performance.now();
       const stats =
-        perftDepth === 0 ? new MoveGeneratorStats(1) : data.testMoves(perftDepth);
+        perftDepth === 0
+          ? new MoveGeneratorStats(1)
+          : perftNodesOnly
+            ? data.testMovesNodesOnly(perftDepth)
+            : data.testMoves(perftDepth);
       const elapsedMs = Math.round((performance.now() - startTime) * 10) / 10;
 
       ({
@@ -165,7 +179,7 @@ function runPerft(context, depth, fen, profile) {
 }
 
 function main() {
-  const { depth, fen, profile } = getCommandLineArguments();
+  const { depth, fen, profile, nodesOnly } = getCommandLineArguments();
   const context = createEngineContext();
 
   loadEngine(context);
@@ -175,9 +189,12 @@ function main() {
 
   console.log(`Depth: ${depth}`);
   console.log(`FEN: ${fen}`);
+  if (nodesOnly) {
+    console.log("Mode: nodes-only");
+  }
   console.log("Start test move calculation:");
 
-  const result = runPerft(context, depth, fen, profile);
+  const result = runPerft(context, depth, fen, profile, nodesOnly);
 
   console.log(`${depth}: ${result.stats}`);
   console.log(`Nodes: ${result.nodes}`);
