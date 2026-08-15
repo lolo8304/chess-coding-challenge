@@ -16,6 +16,10 @@ class BoardData {
     this.debuggingIndexes = [];
     this.history = history;
     this.castlingOptions = new Set(["K", "Q", "k", "q"]);
+    this.castlingRookStartIndexes = {
+      [Piece.WHITE]: { long: 56, short: 63 },
+      [Piece.BLACK]: { long: 0, short: 7 },
+    };
     this.squares = new Array(64).fill(0);
     this.piecesCache = {};
     this.selectedIndex = NOT_SELECTED;
@@ -25,15 +29,15 @@ class BoardData {
     this.legalMoves = undefined;
     this.opponentLegalMoves = undefined;
     this.legalMovesForSelectedIndex = [];
+    this.currentEnPassantTarget = undefined;
     this.resetSquares(fen);
     this.result = undefined;
   }
 
   newHash(color) {
-    const lastMove = this.history.lastMove();
     const enPassantFile =
-      lastMove && lastMove.enPassantTarget
-        ? this.indexToGrid(lastMove.enPassantTarget).gridX
+      this.currentEnPassantTarget !== undefined
+        ? this.indexToGrid(this.currentEnPassantTarget).gridX
         : undefined;
     return new BitBoard(
       this.squares,
@@ -150,62 +154,13 @@ class BoardData {
     const fenboard = fenParts[0];
     const startColor = fenParts[1] === "w" ? Piece.WHITE : Piece.BLACK;
     const castlingOptionsString = fenParts[2] === "-" ? "" : fenParts[2];
-    //const enPassantTarget = fenParts[3]  //TODO: not implemented yet
+    this.currentEnPassantTarget =
+      fenParts[3] === "-" ? undefined : this.algebraicToIndex(fenParts[3]);
     this.halfMoveCounter = +fenParts[4];
     this.nextFullMoveCounter = +fenParts[5];
-    const castlingOptions = {
-      w: {
-        long: castlingOptionsString.includes("Q"),
-        short: castlingOptionsString.includes("K"),
-      },
-      b: {
-        long: castlingOptionsString.includes("q"),
-        short: castlingOptionsString.includes("k"),
-      },
-    };
     this.castlingOptions = new Set(
       castlingOptionsString.replaceAll(" ", "").replaceAll("-", "").split("")
     );
-    if (!castlingOptions["w"].long) {
-      this.history.storeMove(
-        new Move(
-          this,
-          CastlingPositionsWhite[0],
-          CastlingPositionsWhite[0],
-          false
-        )
-      );
-    }
-    if (!castlingOptions["w"].short) {
-      this.history.storeMove(
-        new Move(
-          this,
-          CastlingPositionsWhite[1],
-          CastlingPositionsWhite[1],
-          false
-        )
-      );
-    }
-    if (!castlingOptions["b"].long) {
-      this.history.storeMove(
-        new Move(
-          this,
-          CastlingPositionsBlack[0],
-          CastlingPositionsBlack[0],
-          false
-        )
-      );
-    }
-    if (!castlingOptions["b"].short) {
-      this.history.storeMove(
-        new Move(
-          this,
-          CastlingPositionsBlack[1],
-          CastlingPositionsBlack[1],
-          false
-        )
-      );
-    }
 
     let yIndex = 0;
     let xIndex = 0;
@@ -225,11 +180,48 @@ class BoardData {
         xIndex++;
       }
     }
+    this.setCastlingRookStartIndexes(castlingOptionsString);
     this.legalMoves = new LegalMoves(startColor, this);
     this.opponentLegalMoves = new LegalMoves(
       startColor ^ Piece.COLOR_MASK,
       this
     );
+  }
+
+  setCastlingRookStartIndexes(castlingOptionsString) {
+    this.castlingRookStartIndexes = {
+      [Piece.WHITE]: { long: undefined, short: undefined },
+      [Piece.BLACK]: { long: undefined, short: undefined },
+    };
+
+    for (const char of castlingOptionsString) {
+      if (char === "K") {
+        this.castlingRookStartIndexes[Piece.WHITE].short = 63;
+      } else if (char === "Q") {
+        this.castlingRookStartIndexes[Piece.WHITE].long = 56;
+      } else if (char === "k") {
+        this.castlingRookStartIndexes[Piece.BLACK].short = 7;
+      } else if (char === "q") {
+        this.castlingRookStartIndexes[Piece.BLACK].long = 0;
+      } else if ("A" <= char && char <= "H") {
+        this.setChess960CastlingRookStartIndex(Piece.WHITE, char);
+      } else if ("a" <= char && char <= "h") {
+        this.setChess960CastlingRookStartIndex(Piece.BLACK, char);
+      }
+    }
+  }
+
+  setChess960CastlingRookStartIndex(color, fileChar) {
+    const file = fileChar.toLowerCase().charCodeAt(0) - 97;
+    const rank = color === Piece.WHITE ? 7 : 0;
+    const rookIndex = rank * 8 + file;
+    const kingIndex = this.getKingPosition(color);
+
+    if (rookIndex < kingIndex) {
+      this.castlingRookStartIndexes[color].long = rookIndex;
+    } else {
+      this.castlingRookStartIndexes[color].short = rookIndex;
+    }
   }
 
   calculatedFen() {
@@ -287,10 +279,9 @@ class BoardData {
       castlingString = "-";
     }
 
-    const lastMove = this.history.lastMove();
     let enPassantString =
-      lastMove && lastMove.enPassantTarget
-        ? this.indexToAlgebraic(lastMove.enPassantTarget)
+      this.currentEnPassantTarget !== undefined
+        ? this.indexToAlgebraic(this.currentEnPassantTarget)
         : "-";
 
     // Example: , no en passant, and default half/full move counters.
@@ -382,6 +373,11 @@ class BoardData {
     const rank = 1 + Math.floor(7 - grid.gridY);
     return `${file}${rank}`;
   }
+  algebraicToIndex(square) {
+    const file = square.charCodeAt(0) - 97;
+    const rank = Number(square[1]);
+    return (8 - rank) * 8 + file;
+  }
 
   getMovesAsIamUnderCheck() {
     return this.opponentLegalMoves.getMovesToMyKing();
@@ -425,13 +421,8 @@ class BoardData {
     return "black";
   }
 
-  isLegalEnPassant(targetEnPassant) {
-    const lastMove = this.history.lastMove();
-    return (
-      lastMove &&
-      lastMove.isEnPassantAttackable() &&
-      lastMove.to === targetEnPassant
-    );
+  isLegalEnPassant(targetEnPassant, targetIndex) {
+    return this.currentEnPassantTarget === targetIndex;
   }
 
   getKingPosition(color) {
@@ -566,6 +557,7 @@ class BoardData {
     if (undoMove) {
       this.halfMoveCounter = undoMove.halfMoveCounter;
       this.nextFullMoveCounter = undoMove.nextFullMoveCounter;
+      this.currentEnPassantTarget = undoMove.currentEnPassantTarget;
     }
     this.check = false;
     this.checkMate = false;
@@ -577,6 +569,10 @@ class BoardData {
     move.makeMove();
     move.undoMove.halfMoveCounter = this.halfMoveCounter;
     move.undoMove.nextFullMoveCounter = this.nextFullMoveCounter;
+    move.undoMove.currentEnPassantTarget = this.currentEnPassantTarget;
+    this.currentEnPassantTarget = move.isEnPassantAttackable()
+      ? move.enPassantTarget
+      : undefined;
     this.selectCellIndex(NOT_SELECTED);
     if (withHalfMoves) {
       if (move.pieceOnly === Piece.PAWN || move.isHit) {
