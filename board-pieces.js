@@ -17,7 +17,7 @@ const Piece = {
 
   COLOR_MASK: 24,
 };
-const MAX_DEPTH = 3;
+const MAX_DEPTH = 4;
 let calculationDepth = MAX_DEPTH;
 
 function getCalculationDepth() {
