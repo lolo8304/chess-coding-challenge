@@ -9,6 +9,8 @@ if (typeof window === "undefined") {
       console.error("Failed to load the board module:", err);
     });
 }
+const GAME_CLOCK_START_MILLISECONDS = 10 * 60 * 1000;
+
 class Game {
   constructor(w, h, padding, paddingTop, paddingBottom, fen) {
     this.h = h;
@@ -39,6 +41,13 @@ class Game {
 
     this.velocity = 0.02;
     this.time = 0.0;
+    this.clockStartMilliseconds = GAME_CLOCK_START_MILLISECONDS;
+    this.clockRemainingMilliseconds = {
+      [Piece.WHITE]: this.clockStartMilliseconds,
+      [Piece.BLACK]: this.clockStartMilliseconds,
+    };
+    this.clockRunningColor = undefined;
+    this.clockTurnStartMilliseconds = this.nowMilliseconds();
   }
 
   draw() {
@@ -46,6 +55,7 @@ class Game {
     if (typeof updateConsolePhase === "function") {
       updateConsolePhase();
     }
+    this.syncClockToPhase();
     let turnText =
       this.color === Piece.WHITE
         ? "WHITE's turn" +
@@ -65,13 +75,24 @@ class Game {
       rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
     }
     const fontSize = this.w > 600 ? 40 : this.w > 400 ? 30 : 20;
+    const clockFontSize = this.w > 600 ? 22 : this.w > 400 ? 18 : 14;
+    const bannerMiddleY =
+      this.y - this.paddingTop + this.paddingTop / 2 + (fontSize - 10) / 2;
+    const clockY =
+      this.y -
+      this.paddingTop +
+      this.paddingTop / 2 +
+      (clockFontSize - 10) / 2;
     textSize(fontSize);
     fill("white");
     textAlign(CENTER);
-    text(
-      turnText,
-      this.x + this.w / 2,
-      this.y - this.paddingTop + this.paddingTop / 2 + (fontSize - 10) / 2
+    text(turnText, this.x + this.w / 2, bannerMiddleY);
+    this.drawClock(Piece.WHITE, "left", this.x + this.padding, clockY);
+    this.drawClock(
+      Piece.BLACK,
+      "right",
+      this.x + this.w - this.padding,
+      clockY
     );
     if (!this.board.data.isFinished()) {
       if (this.time > 1.0) {
@@ -89,6 +110,75 @@ class Game {
       }
       this.time += this.velocity;
     }
+  }
+
+  nowMilliseconds() {
+    return typeof performance !== "undefined" ? performance.now() : Date.now();
+  }
+
+  isEndPhase() {
+    return this.effectivePhase() === "end";
+  }
+
+  effectivePhase() {
+    if (typeof effectiveGamePhase === "function") {
+      return effectiveGamePhase();
+    }
+    return this.board.data.isFinished() ? "end" : "play";
+  }
+
+  syncClockToPhase() {
+    const phase = this.effectivePhase();
+    if (phase !== "play") {
+      this.stopActiveClock();
+      return;
+    }
+    if (this.clockRunningColor !== this.color) {
+      this.stopActiveClock();
+      this.startClock(this.color);
+    }
+  }
+
+  remainingMilliseconds(color) {
+    let remaining = this.clockRemainingMilliseconds[color];
+    if (this.clockRunningColor === color) {
+      remaining -= this.nowMilliseconds() - this.clockTurnStartMilliseconds;
+    }
+    return Math.max(0, remaining);
+  }
+
+  formatClockMilliseconds(milliseconds) {
+    const totalSeconds = Math.ceil(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  }
+
+  drawClock(color, align, x, y) {
+    const label = this.formatClockMilliseconds(this.remainingMilliseconds(color));
+    const clockFontSize = this.w > 600 ? 22 : this.w > 400 ? 18 : 14;
+    fill("white");
+    textSize(clockFontSize);
+    textAlign(CENTER);
+    const clockHalfWidth = clockFontSize * 1.5;
+    const alignedX = align === "left" ? x + clockHalfWidth : x - clockHalfWidth;
+    text(label, alignedX, y);
+  }
+
+  stopActiveClock() {
+    if (this.clockRunningColor === undefined) return;
+    const color = this.clockRunningColor;
+    this.clockRemainingMilliseconds[color] = this.remainingMilliseconds(color);
+    this.clockRunningColor = undefined;
+  }
+
+  startClock(color) {
+    if (this.isEndPhase()) {
+      this.clockRunningColor = undefined;
+      return;
+    }
+    this.clockRunningColor = color;
+    this.clockTurnStartMilliseconds = this.nowMilliseconds();
   }
 
   undoLastMove() {
@@ -117,6 +207,7 @@ class Game {
       fenHTML.value = fen;
       window.location.hash = fen;
     }
+    this.startClock(this.color);
     if (runComputerNow) {
       this.computerMove(undefined, depth + 1);
     } else {
@@ -129,6 +220,7 @@ class Game {
     if (typeof setGamePhase === "function") {
       setGamePhase("play");
     }
+    this.stopActiveClock();
     this.board.makeMove(move, true);
     this.makeTurnAndCalculate(depth, runComputerNow);
     if (typeof updateConsolePhase === "function") {
