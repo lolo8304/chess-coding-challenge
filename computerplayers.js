@@ -26,7 +26,7 @@ class ComputerPlayer {
     this.color = color;
     this._isOn = false;
     this.runNext = false;
-    this.tt = TranspositionTableInstance(color);
+    this.tt = TranspositionTableInstance();
   }
 
   isTurn(color) {
@@ -110,7 +110,7 @@ class ComputerPlayerAlphaBetaPruning extends ComputerPlayer {
     const evalutator = new Evaluator(this.tt, this.boardData, this.color);
     const { bestMove, evaluation, count, cutOffs } =
       evalutator.searchAlphaBetaPruningAll(
-        MAX_DEPTH,
+        getCalculationDepth(),
         -Infinity,
         Infinity,
         true
@@ -318,16 +318,17 @@ class Evaluator {
     value += Math.floor(pawnEarly * (1 - endgameT));
     value += Math.floor(pawnLate * endgameT);
 
-    if (this.data.getPiecesCache(Piece.KING | colorIndex)[0]) {
+    const kingIndex = this.data.getKingPosition(colorIndex);
+    if (kingIndex !== undefined) {
       const kingEarlyPhase = PieceSquareTable.read(
         PieceSquareTable.KingStart,
-        this.data.getPiecesCache(Piece.KING | colorIndex)[0],
+        kingIndex,
         isWhite
       );
       value += Math.floor(kingEarlyPhase * (1 - endgameT));
       const kingLatePhase = PieceSquareTable.read(
         PieceSquareTable.KingEnd,
-        this.data.getPiecesCache(Piece.KING | colorIndex)[0],
+        kingIndex,
         isWhite
       );
       value += Math.floor(kingLatePhase * endgameT);
@@ -355,12 +356,14 @@ class Evaluator {
       const friendlyIndex = isWhite ? Piece.WHITE : Piece.BLACK;
       const opponentIndex = isWhite ? Piece.BLACK : Piece.WHITE;
 
-      const friendlyKingSquare = this.data.getPiecesCache(
-        Piece.KING | friendlyIndex
-      )[0];
-      const opponentKingSquare = this.data.getPiecesCache(
-        Piece.KING | opponentIndex
-      )[0];
+      const friendlyKingSquare = this.data.getKingPosition(friendlyIndex);
+      const opponentKingSquare = this.data.getKingPosition(opponentIndex);
+      if (
+        friendlyKingSquare === undefined ||
+        opponentKingSquare === undefined
+      ) {
+        return 0;
+      }
       // Encourage moving king closer to opponent king
       mopUpScore +=
         4 * (14 - OrthogonalDistance[friendlyKingSquare][opponentKingSquare]);
@@ -377,13 +380,33 @@ class Evaluator {
 
   searchAlphaBetaPruningAll(depth, alpha, beta, maximizingPlayer) {
     const startTime = performance.now();
-    const result = this.searchAlphaBetaPruning(
-      false,
-      depth,
-      alpha,
-      beta,
-      maximizingPlayer
-    );
+    let result = undefined;
+    let totalCount = 0;
+    let totalCutOffs = 0;
+    for (let currentDepth = 1; currentDepth <= depth; currentDepth++) {
+      result = this.searchAlphaBetaPruning(
+        false,
+        currentDepth,
+        alpha,
+        beta,
+        maximizingPlayer
+      );
+      totalCount += result.count;
+      totalCutOffs += result.cutOffs;
+      verbose === 1 &&
+        console.log(
+          "Iterative depth " +
+            currentDepth +
+            ": best=" +
+            result.bestMove?.toAlgebraicNotation() +
+            ", eval=" +
+            result.evaluation +
+            ", count=" +
+            result.count +
+            ", cuts=" +
+            result.cutOffs
+        );
+    }
     const diffTime = Math.round(performance.now() - startTime);
     console.log(
       "Search all: best=" +
@@ -391,9 +414,9 @@ class Evaluator {
         ", name=" +
         result.bestMove?.pieceName +
         ", count=" +
-        result.count +
+        totalCount +
         ", cuts: " +
-        result.cutOffs +
+        totalCutOffs +
         ", eval=" +
         result.evaluation +
         ", time=" +
@@ -401,7 +424,12 @@ class Evaluator {
         " [ms]"
     );
     this.tt.printStats();
-    return result;
+    return {
+      bestMove: result.bestMove,
+      evaluation: result.evaluation,
+      count: totalCount,
+      cutOffs: totalCutOffs,
+    };
   }
 
   searchAlphaBetaPruningCapturesOnly(alpha, beta, maximizingPlayer) {
@@ -455,11 +483,12 @@ class Evaluator {
         cutOffs: 0,
       };
     }
+    const ttBestMove = this.tt.bestMoveForOrdering(newHash);
     let moves = [...this.data.legalMoves.moves];
     if (capturesOnly && !this.data.check) {
       moves = moves.filter((x) => x.isHit);
     }
-    moves = this.orderMoves(moves);
+    moves = this.orderMoves(moves, ttBestMove);
     let minMaxEval = 0;
     if (maximizingPlayer) {
       minMaxEval = -Infinity;
@@ -622,9 +651,12 @@ class Evaluator {
     };
   }
 
-  orderMoves(moves) {
+  orderMoves(moves, ttBestMove = undefined) {
     for (const move of moves) {
       let moveScoreGuess = 0;
+      if (ttBestMove && move.eqFromTo(ttBestMove)) {
+        moveScoreGuess += 1000000;
+      }
       const movePieceType = move.pieceOnly;
       if (move.isHit) {
         const capturePieceType = move.targetPieceOnly;

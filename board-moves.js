@@ -124,6 +124,41 @@ class Move {
     return indexes;
   }
 
+  addIndexesToLookup(lookup, indexes) {
+    if (!isSlidingPiece(this.pieceOnly)) {
+      lookup[this.from] = true;
+      indexes.push(this.from);
+      lookup[this.to] = true;
+      indexes.push(this.to);
+      return;
+    }
+
+    const fromY = Math.floor(this.from / ROW_CELLS);
+    const fromX = this.from % ROW_CELLS;
+    const toY = Math.floor(this.to / ROW_CELLS);
+    const toX = this.to % ROW_CELLS;
+    const stepY = Math.sign(toY - fromY);
+    const stepX = Math.sign(toX - fromX);
+    let currentY = fromY;
+    let currentX = fromX;
+    let counter = 0;
+
+    while (currentY !== toY || currentX !== toX) {
+      const index = currentY * ROW_CELLS + currentX;
+      lookup[index] = true;
+      indexes.push(index);
+      currentY += stepY;
+      currentX += stepX;
+      counter++;
+      if (counter > 8) {
+        throw Error("Looping ");
+      }
+    }
+    const index = currentY * ROW_CELLS + currentX;
+    lookup[index] = true;
+    indexes.push(index);
+  }
+
   toCoordinateNotation() {
     const sourceSquare = this.board.indexToAlgebraic(this.from);
     const targetSquare = this.board.indexToAlgebraic(this.to);
@@ -643,12 +678,10 @@ class LegalMoves {
     for (const moveOfKing of this.moves) {
       if (moveOfKing.from !== kingIndex) continue;
 
-      moveOfKing.makeMove();
-      const kingInCheck = this.boardData.isIndexAttackedByColor(
-        moveOfKing.to,
+      const kingInCheck = this.boardData.isKingMoveTargetAttacked(
+        moveOfKing,
         opponentColor
       );
-      moveOfKing.undoLastMove();
       if (kingInCheck) {
         movesToRemove.push(moveOfKing);
       }
@@ -712,6 +745,9 @@ class LegalMoves {
   findPinnedPieces() {
     const kingIndex = this.boardData.getKingPosition(this.color);
     const pinnedPieces = {};
+    if (kingIndex === undefined) {
+      return pinnedPieces;
+    }
 
     for (
       let directionIndex = 0;
@@ -769,12 +805,7 @@ class LegalMoves {
     this.checkAttackIndexes = [];
     const checkAttackLookup = [];
     for (const move of movesToCheck) {
-      const indexes = move.getIndexes();
-      for (let indexOffset = 0; indexOffset < indexes.length; indexOffset++) {
-        const attackIndex = indexes[indexOffset];
-        this.checkAttackIndexes.push(attackIndex);
-        checkAttackLookup[attackIndex] = true;
-      }
+      move.addIndexesToLookup(checkAttackLookup, this.checkAttackIndexes);
     }
     const movesToKeep = [];
     for (const move of this.moves) {
@@ -801,12 +832,10 @@ class LegalMoves {
         continue;
       }
 
-      moveOfKing.makeMove();
-      const kingInCheck = this.boardData.isIndexAttackedByColor(
-        moveOfKing.to,
+      const kingInCheck = this.boardData.isKingMoveTargetAttacked(
+        moveOfKing,
         color
       );
-      moveOfKing.undoLastMove();
       if (!kingInCheck) {
         movesToKeep.push(moveOfKing);
       }

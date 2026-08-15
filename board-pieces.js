@@ -17,7 +17,21 @@ const Piece = {
 
   COLOR_MASK: 24,
 };
-const MAX_DEPTH = 2;
+const MAX_DEPTH = 3;
+let calculationDepth = MAX_DEPTH;
+
+function getCalculationDepth() {
+  return calculationDepth;
+}
+
+function setCalculationDepth(depth) {
+  const parsedDepth = parseInt(depth, 10);
+  if (1 <= parsedDepth && parsedDepth <= 7) {
+    calculationDepth = parsedDepth;
+  }
+  return calculationDepth;
+}
+
 const SlidingPieces = [Piece.BISHOP, Piece.ROOK, Piece.QUEEN];
 const PromotionPieceTypes = [
   Piece.QUEEN,
