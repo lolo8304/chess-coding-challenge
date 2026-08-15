@@ -1,55 +1,206 @@
 <!DOCTYPE html>
 <html lang="">
-  <head>
-    <meta charset="utf-8" />
+<head>
+    <meta charset="utf-8"/>
     <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>Coding challenge - Chess</title>
     <style>
-      body {
-        padding: 0;
-        margin: 0;
-        background-color: #1b1b1b;
-      }
+        body {
+            padding: 0;
+            margin: 0;
+            background-color: #1b1b1b;
+        }
 
-      button {
-        -webkit-tap-highlight-color: transparent; /* Prevent tap highlight color */
-        font-size: 16px; /* Use at least 16px to prevent zooming on focus */
-        padding: 10px;
-      }
+        button {
+            -webkit-tap-highlight-color: transparent; /* Prevent tap highlight color */
+            font-size: 16px; /* Use at least 16px to prevent zooming on focus */
+            padding: 10px;
+        }
 
-      select {
-        font-size: 16px;
-        padding: 10px;
-      }
+        select {
+            font-size: 16px;
+            padding: 10px;
+        }
 
-      canvas {
-        display: block;
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        -khtml-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-        outline: none;
-        -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
-        /* mobile webkit */
-      }
-      .full-width-input {
-          width: 100%;         /* Makes the input take up 100% of its parent's width */
-          box-sizing: border-box; /* Includes padding and border in the element's width */
-          font-size: large;
-          font-family: 'Arial', sans-serif;
-          margin-bottom: 10px;
-      }
-      .body {
-        color: white
-      }
-      .computer-switcher {
-        width: 50%;
-      }
+        .control-row {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        canvas {
+            display: block;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            outline: none;
+            -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
+            /* mobile webkit */
+        }
+
+        .full-width-input {
+            width: 100%; /* Makes the input take up 100% of its parent's width */
+            box-sizing: border-box; /* Includes padding and border in the element's width */
+            font-size: large;
+            font-family: 'Arial', sans-serif;
+            margin-bottom: 10px;
+        }
+
+        .body {
+            color: white;
+            align-content: center;
+            display: flex;
+            justify-content: center;
+        }
+
+        .main canvas {
+            width: 100%;
+        }
+
+        .console {
+            background-color: #1b1b1b;
+        }
+
+        .console-header {
+            align-items: center;
+            background-color: #000;
+            display: flex;
+            gap: 8px;
+            justify-content: space-between;
+            padding: 10px 0;
+        }
+
+        .console-toggle {
+            align-items: center;
+            background: transparent;
+            border: 1px solid #666;
+            color: white;
+            cursor: pointer;
+            display: inline-flex;
+            flex: 0 0 auto;
+            height: 42px;
+            justify-content: center;
+            padding: 0;
+            width: 42px;
+        }
+
+        .console-toggle svg {
+            height: 24px;
+            width: 24px;
+        }
+
+        .computer-mode-button.active {
+            background-color: #d7e6c5;
+            border: 2px solid #7f9a63;
+        }
+
+        .icon-button {
+            align-items: center;
+            display: inline-flex;
+            height: 48px;
+            justify-content: center;
+            width: 48px;
+            padding: 0;
+        }
+
+        #calculationDepth {
+            box-sizing: border-box;
+            height: 48px;
+            width: 76px;
+        }
+
+        .king-icon {
+            background-image: url("images/Chess_Pieces_Sprite-large.png");
+            background-repeat: no-repeat;
+            background-size: 252px 84px;
+            display: inline-block;
+            height: 42px;
+            width: 42px;
+        }
+
+        .white-king-icon {
+            background-position: 0 0;
+        }
+
+        .black-king-icon {
+            background-position: 0 -42px;
+        }
+
+        .split-king-icon {
+            display: inline-block;
+            height: 42px;
+            position: relative;
+            width: 42px;
+        }
+
+        .split-king-half {
+            height: 42px;
+            overflow: hidden;
+            position: absolute;
+            top: 0;
+            width: 21px;
+        }
+
+        .split-king-left {
+            left: 0;
+        }
+
+        .split-king-right {
+            left: 21px;
+        }
+
+        .split-king-right .king-icon {
+            transform: translateX(-21px);
+        }
+
+        .mode-icon {
+            height: 24px;
+            width: 24px;
+        }
+
+        .ai-mode-icon {
+            height: 40px;
+            width: 40px;
+        }
+
+        .visually-hidden {
+            clip: rect(0 0 0 0);
+            clip-path: inset(50%);
+            height: 1px;
+            overflow: hidden;
+            position: absolute;
+            white-space: nowrap;
+            width: 1px;
+        }
+
+        .console.collapsed .console-body,
+        .console.collapsed .chevron-up,
+        .console:not(.collapsed) .chevron-down {
+            display: none;
+        }
+
+        .console-body {
+            padding-top: 10px;
+        }
+
+        .fen-row {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+        }
+
+        .fen-row .full-width-input {
+            flex: 1 1 auto;
+            margin-bottom: 0;
+            min-width: 0;
+        }
     </style>
 
     </style>
@@ -73,128 +224,212 @@
             event.preventDefault();
             const fenValue = document.getElementById('fen').value;
             if (fenValue) {
-              window.location.hash = fenValue
-              window.location.reload();
+                window.location.hash = fenValue
+                window.location.reload();
             }
         }
 
         function updateStatus(computer, status) {
-          const resultElement = document.getElementById('result');
-          if (computer === 'white') {
-              status === "ON" ? game.computerWhite.on().checkForAutoTurn() :  game.computerWhite.off()
-          } else if (computer === 'black') {
-              status === "ON" ? game.computerBlack.on().checkForAutoTurn() :  game.computerBlack.off()
-          }
+            const resultElement = document.getElementById('result');
+            if (computer === 'white') {
+                status === "ON" ? game.computerWhite.on().checkForAutoTurn() : game.computerWhite.off()
+            } else if (computer === 'black') {
+                status === "ON" ? game.computerBlack.on().checkForAutoTurn() : game.computerBlack.off()
+            }
         }
+
+        function setComputerMode(mode) {
+            let selectedMode = mode;
+            if (mode === 'random') {
+                selectedMode = Math.random() < 0.5 ? 'white' : 'black';
+            }
+
+            if (selectedMode === 'white') {
+                updateStatus('white', 'OFF');
+                updateStatus('black', 'ON');
+            } else if (selectedMode === 'black') {
+                updateStatus('black', 'OFF');
+                updateStatus('white', 'ON');
+            } else if (selectedMode === 'ai-vs-ai') {
+                updateStatus('white', 'ON');
+                updateStatus('black', 'ON');
+            }
+
+            document.querySelectorAll('.computer-mode-button').forEach(function (button) {
+                button.classList.toggle('active', button.dataset.mode === selectedMode);
+            });
+        }
+
         function updateCalculationDepth(depth) {
-          setCalculationDepth(depth);
+            setCalculationDepth(depth);
         }
+
         function updateDebug(checked) {
-          verbose = checked ? 1 : 0;
+            verbose = checked ? 1 : 0;
         }
-        document.addEventListener('DOMContentLoaded', function() {
+
+        document.addEventListener('DOMContentLoaded', function () {
             setupFen();
             const calculationDepthElement = document.getElementById('calculationDepth');
             if (calculationDepthElement) {
-              calculationDepthElement.value = getCalculationDepth();
+                calculationDepthElement.value = getCalculationDepth();
             }
             const debugElement = document.getElementById('debug');
             if (debugElement) {
-              debugElement.checked = verbose > 0;
+                debugElement.checked = verbose > 0;
             }
         });
 
         function stats(depth, stat) {
-          setTimeout(function stats2() {
-            const testMovesResults = document.getElementById('testMovesResults');
-            testMovesResults.innerHTML = testMovesResults.innerHTML + "<br>"+depth+": "+stat
-          }, 100);
+            setTimeout(function stats2() {
+                const testMovesResults = document.getElementById('testMovesResults');
+                testMovesResults.innerHTML = testMovesResults.innerHTML + "<br>" + depth + ": " + stat
+            }, 100);
         }
 
         function testMovesStart() {
-          if (window.location.hostname !== "localhost1") {
-            const testMovesElement = document.getElementById('testMovesElem');
-            const testMovesResults = document.getElementById('testMovesResults');
-            testMovesResults.innerHTML = ""
-            testMovesElement.setAttribute("style", "display:none");
-            setTimeout(function test() {
-              testMoves(stats)
-              testMovesElement.setAttribute("style", "display:")
-            }, 100);
-          }
+            if (window.location.hostname !== "localhost1") {
+                const testMovesElement = document.getElementById('testMovesElem');
+                const testMovesResults = document.getElementById('testMovesResults');
+                if (!testMovesElement || !testMovesResults) {
+                    return;
+                }
+                testMovesResults.innerHTML = ""
+                testMovesElement.setAttribute("style", "display:none");
+                setTimeout(function test() {
+                    testMoves(stats)
+                    testMovesElement.setAttribute("style", "display:")
+                }, 100);
+            }
         }
+
         function setupFen() {
-          if (window.location.hostname !== "localhost1") {
-            const testMovesElement = document.getElementById('testMovesElem');
-            testMovesElement.setAttribute("style", "display:")
-            const fenLibraryElement = document.getElementById('fenLibrary');
-            fenLibraryElement.setAttribute("style", "display:")
-          }
-          fen = window.location.hash
-          if (!fen) {
-            fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-          } else {
-            fen = fen.replace(/%20/g, ' ').substring(1)
-          }
-          fenUI = window.document.getElementById("fen")
-          if (fenUI) {
-            fenUI.value = fen
-          }
+            if (window.location.hostname !== "localhost") {
+                const testMovesElement = document.getElementById('testMovesElem');
+                if (testMovesElement) {
+                    testMovesElement.setAttribute("style", "display:")
+                }
+                const fenLibraryElement = document.getElementById('fenLibrary');
+                if (fenLibraryElement) {
+                    fenLibraryElement.setAttribute("style", "display:")
+                }
+            }
+            fen = window.location.hash
+            if (!fen) {
+                fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            } else {
+                fen = fen.replace(/%20/g, ' ').substring(1)
+            }
+            fenUI = window.document.getElementById("fen")
+            if (fenUI) {
+                fenUI.value = fen
+            }
+        }
+
+        function toggleConsole() {
+            const consoleElement = document.querySelector('.console');
+            const toggleElement = document.getElementById('consoleToggle');
+            const isCollapsed = consoleElement.classList.toggle('collapsed');
+            toggleElement.setAttribute('aria-expanded', String(!isCollapsed));
         }
     </script>
-  </head>
+</head>
 
-  <body class="body">
+<body class="body">
+<div class="main">
     <main></main>
-    <div>
+    <div class="console">
         <form onsubmit="handleSubmit(event)">
-          <input id="fen" class="full-width-input" value="" id="fen" />
-          <button onclick="window.location.href='/'; return false" type="button">New</button>
-          <button type="submit">FEN</button>
-          <button style="display:none" id="testMovesElem" onclick="testMovesStart(); return false" type="button">Test moves</button>
-          <a id="fenLibrary" style="display:none" href="https://www.chessprogramming.org/Perft_Results" target="_blank" class="body">FEN library</a>
-          &nbsp;Time: <span id="timeLastMove"></span>
-          <button onclick="undoLastMove(); return false" type="button">Undo</button>
-          <label for="calculationDepth">Depth</label>
-          <select id="calculationDepth" onchange="updateCalculationDepth(this.value)">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4" selected>4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-          </select>
-          <label for="debug">Debug</label>
-          <input id="debug" type="checkbox" onchange="updateDebug(this.checked)" />
+            <div class="console-header">
+                <div class="control-row">
+	                    <button class="icon-button" onclick="window.location.href='/'; return false" type="button"
+	                            aria-label="New game">
+	                        <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+	                             stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+	                            <path stroke-linecap="round" stroke-linejoin="round"
+	                                  d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5A3.375 3.375 0 0 0 10.125 2.25H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h8.625M10.5 2.25 19.5 11.25m-2.25 4.5v6m3-3h-6"/>
+	                        </svg>
+	                        <span class="visually-hidden">New</span>
+	                    </button>
+	                    <button class="icon-button" onclick="undoLastMove(); return false" type="button"
+	                            aria-label="Undo move">
+	                        <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+	                             stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+	                            <path stroke-linecap="round" stroke-linejoin="round"
+	                                  d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"/>
+	                        </svg>
+	                        <span class="visually-hidden">Undo</span>
+	                    </button>
+                    <button class="computer-mode-button icon-button active" data-mode="white"
+                            onclick="setComputerMode('white'); return false" type="button" aria-label="White">
+                        <span class="king-icon white-king-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">White</span>
+                    </button>
+                    <button class="computer-mode-button icon-button" data-mode="black"
+                            onclick="setComputerMode('black'); return false" type="button" aria-label="Black">
+                        <span class="king-icon black-king-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Black</span>
+                    </button>
+                    <button class="computer-mode-button icon-button" data-mode="random"
+                            onclick="setComputerMode('random'); return false" type="button" aria-label="Random">
+                        <span class="split-king-icon" aria-hidden="true">
+                            <span class="split-king-half split-king-left">
+                                <span class="king-icon white-king-icon"></span>
+                            </span>
+                            <span class="split-king-half split-king-right">
+                                <span class="king-icon black-king-icon"></span>
+                            </span>
+                        </span>
+                        <span class="visually-hidden">Random</span>
+                    </button>
+                    <button class="computer-mode-button icon-button" data-mode="ai-vs-ai"
+                            onclick="setComputerMode('ai-vs-ai'); return false" type="button" aria-label="AI vs. AI">
+                        <svg class="mode-icon ai-mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+                             viewBox="0 0 24 24"
+                             stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M12 3.75v2.25m-5.25 5.25H4.5m15 0h-2.25M8.25 4.5 10.5 6l1.5-2.25L13.5 6l2.25-1.5m-7.5 1.5h7.5M7.5 8.25h9a2.25 2.25 0 0 1 2.25 2.25v5.25A2.25 2.25 0 0 1 16.5 18h-9a2.25 2.25 0 0 1-2.25-2.25V10.5A2.25 2.25 0 0 1 7.5 8.25Zm2.25 3.75h.01M14.25 12h.01M9.75 15h4.5"/>
+                        </svg>
+                        <span class="visually-hidden">AI vs. AI</span>
+                    </button>
+                </div>
+                <select id="calculationDepth" onchange="updateCalculationDepth(this.value)">
+                    <option value="1">400</option>
+                    <option value="2">700</option>
+                    <option value="3">900</option>
+                    <option value="4" selected>1200</option>
+                    <option value="5">1500</option>
+                    <option value="6">1800</option>
+                    <option value="7">2000</option>
+                </select>
+                <button
+                        id="consoleToggle"
+                        class="console-toggle"
+                        onclick="toggleConsole(); return false"
+                        type="button"
+                        aria-label="Toggle console"
+                        aria-expanded="true"
+                        aria-controls="consoleBody"
+                >
+                    <svg class="chevron-down" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                         stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
+                    </svg>
+                    <svg class="chevron-up" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                         stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="consoleBody" class="console-body">
+                <div class="fen-row">
+                    <button type="submit">FEN</button>
+                    <input id="fen" class="full-width-input" value=""/>
+                </div>
+            </div>
         </form>
+    </div>
+</div>
 
-        <form id="computerForm" style="display: flex;padding:10px;">
-          <fieldset class="computer-switcher">
-              <legend>WHITE computer</legend>
-              <label>
-                  <input type="radio" name="whitePower" value="ON" onchange="updateStatus('white', 'ON')">
-                  ON
-              </label>
-              <label>
-                  <input type="radio" name="whitePower" value="OFF" onchange="updateStatus('white', 'OFF')" checked>
-                  OFF
-              </label>
-          </fieldset>
-
-          <fieldset class="computer-switcher">
-              <legend>BLACK computer</legend>
-              <label>
-                  <input type="radio" name="blackPower" value="ON" onchange="updateStatus('black', 'ON')" checked>
-                  ON
-              </label>
-              <label>
-                  <input type="radio" name="blackPower" value="OFF" onchange="updateStatus('black', 'OFF')" >
-                  OFF
-              </label>
-          </fieldset>
-      </form>
-      </div>
-      <div id="testMovesResults"></div>
-  </body>
+</body>
 </html>
