@@ -157,6 +157,11 @@ When working on AI:
 - whenever you make changes, accept that i also make changes myself and always use all changes in git. also for testing: don’t start any services. 
 - i have stated them in watch mode and you can use it via port 8080
 
+## Run perfts
+
+- never go beyond 3, 3 is max due to performance issues on coding side
+- for regressions tests within after an agent change - run the first 1-20 in pert only
+
 ## Commit, Push, merge rules
 
 - use the existing main branch

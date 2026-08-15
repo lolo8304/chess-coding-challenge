@@ -6,6 +6,7 @@ perft_js="$script_dir/perft.js"
 fixture_json="$script_dir/regression-perft.json"
 max_depth="${1:-}"
 filter="${2:-}"
+range="${3:-}"
 
 if [ ! -f "$fixture_json" ]; then
   echo "Error: regression-perft.json not found next to this script" >&2
@@ -17,8 +18,11 @@ if [ -z "$max_depth" ]; then
 fi
 
 if ! [[ "$max_depth" =~ ^[0-9]+$ ]] || [ "$max_depth" -lt 1 ]; then
-  echo "Usage: $0 [max-depth] [name-filter]" >&2
-  echo "Example: $0 2 chess960-032" >&2
+  echo "Usage: $0 [max-depth] [name-filter] [case-range]" >&2
+  echo "Examples:" >&2
+  echo "  $0 2 '' 10" >&2
+  echo "  $0 2 chess960 10-" >&2
+  echo "  $0 2 chess960 10-20" >&2
   exit 1
 fi
 
@@ -32,7 +36,7 @@ if [ ! -f "$perft_js" ]; then
   exit 1
 fi
 
-PERFT_JS="$perft_js" FIXTURE_JSON="$fixture_json" MAX_DEPTH="$max_depth" CASE_FILTER="$filter" node <<'REGRESSION_NODE'
+PERFT_JS="$perft_js" FIXTURE_JSON="$fixture_json" MAX_DEPTH="$max_depth" CASE_FILTER="$filter" CASE_RANGE="$range" node <<'REGRESSION_NODE'
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 
@@ -40,6 +44,7 @@ const perftJs = process.env.PERFT_JS;
 const fixtureJson = process.env.FIXTURE_JSON;
 const maxDepth = Number(process.env.MAX_DEPTH || 2);
 const caseFilter = process.env.CASE_FILTER || "";
+const caseRange = process.env.CASE_RANGE || "";
 const fixture = JSON.parse(fs.readFileSync(fixtureJson, "utf8"));
 const statAliases = { captures: "hits", promotions: "prom" };
 
@@ -73,12 +78,46 @@ function expectedEntries(expected) {
 }
 
 const cases = fixture.cases || [];
-const selectedCases = caseFilter
+let selectedCases = caseFilter
   ? cases.filter((testCase) => testCase.name.includes(caseFilter))
   : cases;
 
+function parseCaseRange(value, total) {
+  if (!value) return { start: 1, end: total };
+
+  let match = value.match(/^(\d+)$/);
+  if (match) {
+    return { start: 1, end: Number(match[1]) };
+  }
+
+  match = value.match(/^(\d+)-$/);
+  if (match) {
+    return { start: Number(match[1]), end: total };
+  }
+
+  match = value.match(/^(\d+)-(\d+)$/);
+  if (match) {
+    return { start: Number(match[1]), end: Number(match[2]) };
+  }
+
+  throw new Error(
+    "Invalid case range. Use N, N-, or N-M, for example 10, 10-, or 10-20."
+  );
+}
+
+try {
+  const { start, end } = parseCaseRange(caseRange, selectedCases.length);
+  if (start < 1 || end < start) {
+    throw new Error("Invalid case range bounds.");
+  }
+  selectedCases = selectedCases.slice(start - 1, end);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
 if (selectedCases.length === 0) {
-  console.error("No regression cases matched filter: " + caseFilter);
+  console.error("No regression cases matched filter/range.");
   process.exit(1);
 }
 
@@ -88,6 +127,8 @@ let depthTargets = 0;
 console.log("Perft Regression Suite (max depth " + maxDepth + ")");
 console.log("Fixture: " + fixtureJson);
 console.log("Cases: " + selectedCases.length + " / " + cases.length);
+if (caseFilter) console.log("Filter: " + caseFilter);
+if (caseRange) console.log("Range: " + caseRange);
 
 let i = 0;
 for (const testCase of selectedCases) {

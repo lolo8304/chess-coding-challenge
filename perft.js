@@ -7,26 +7,30 @@ const START_FEN =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 function usage() {
-  console.error('Usage: node perft.js <depth> "<fen>"');
+  console.error('Usage: node perft.js [--profile] <depth> "<fen>"');
   console.error(`Example: node perft.js 3 "${START_FEN}"`);
+  console.error(`Example: node perft.js --profile 3 "${START_FEN}"`);
   process.exit(1);
 }
 
 function getCommandLineArguments() {
   const args = process.argv.slice(2);
-  if (args.length < 1 || args.length > 2) {
+  const profile = args.includes("--profile");
+  const positionalArgs = args.filter((arg) => arg !== "--profile");
+
+  if (positionalArgs.length < 1 || positionalArgs.length > 2) {
     usage();
   }
 
-  const depth = parseInt(args[0], 10);
-  const fen = args[1] || START_FEN;
+  const depth = parseInt(positionalArgs[0], 10);
+  const fen = positionalArgs[1] || START_FEN;
 
   if (Number.isNaN(depth) || depth < 0) {
     console.error("Depth must be a non-negative integer.");
     usage();
   }
 
-  return { depth, fen };
+  return { depth, fen, profile };
 }
 
 function createEngineContext() {
@@ -74,9 +78,67 @@ function loadEngine(context) {
   });
 }
 
-function runPerft(context, depth, fen) {
+function installProfiler(context) {
+  vm.runInContext(
+    `
+      var perftProfiler = {
+        metrics: Object.create(null),
+        wrap(prototype, methodName, label) {
+          const original = prototype && prototype[methodName];
+          if (typeof original !== "function") {
+            throw new Error("Cannot profile missing method: " + label);
+          }
+
+          const metrics = this.metrics;
+          prototype[methodName] = function () {
+            const startTime = performance.now();
+            try {
+              return original.apply(this, arguments);
+            } finally {
+              const elapsedMs = performance.now() - startTime;
+              const metric =
+                metrics[label] ||
+                (metrics[label] = { label, calls: 0, totalMs: 0 });
+              metric.calls++;
+              metric.totalMs += elapsedMs;
+            }
+          };
+        },
+        report(totalMs) {
+          return Object.values(this.metrics)
+            .map((metric) => ({
+              label: metric.label,
+              calls: metric.calls,
+              totalMs: Math.round(metric.totalMs * 10) / 10,
+              avgMs:
+                Math.round((metric.totalMs / Math.max(metric.calls, 1)) * 1000) /
+                1000,
+              percent:
+                Math.round((metric.totalMs / Math.max(totalMs, 0.001)) * 1000) /
+                10,
+            }))
+            .sort((left, right) => right.totalMs - left.totalMs);
+        },
+      };
+
+      perftProfiler.wrap(BoardData.prototype, "setLegalMovesFor", "BoardData.setLegalMovesFor");
+      perftProfiler.wrap(BoardData.prototype, "makeMove", "BoardData.makeMove");
+      perftProfiler.wrap(BoardData.prototype, "undoMove", "BoardData.undoMove");
+      perftProfiler.wrap(BoardData.prototype, "isIndexAttackedByColor", "BoardData.isIndexAttackedByColor");
+      perftProfiler.wrap(LegalMoves.prototype, "generateMoves", "LegalMoves.generateMoves");
+      perftProfiler.wrap(LegalMoves.prototype, "limitingMovementPinnedPieces", "LegalMoves.limitingMovementPinnedPieces");
+      perftProfiler.wrap(LegalMoves.prototype, "removePseudoIllegalMovesForMyKing", "LegalMoves.removePseudoIllegalMovesForMyKing");
+      perftProfiler.wrap(Move.prototype, "makeMove", "Move.makeMove");
+    `,
+    context,
+    { filename: "perft-profiler.js" }
+  );
+}
+
+function runPerft(context, depth, fen, profile) {
   context.perftDepth = depth;
   context.perftFen = fen;
+  context.perftProfile = profile;
 
   return vm.runInContext(
     `
@@ -93,6 +155,7 @@ function runPerft(context, depth, fen) {
         stats: stats.toString(),
         nodes: stats.nodes,
         elapsedMs,
+        profile: perftProfile ? perftProfiler.report(elapsedMs) : undefined,
         finalFen: data.calculatedFen(),
       });
     `,
@@ -102,20 +165,40 @@ function runPerft(context, depth, fen) {
 }
 
 function main() {
-  const { depth, fen } = getCommandLineArguments();
+  const { depth, fen, profile } = getCommandLineArguments();
   const context = createEngineContext();
 
   loadEngine(context);
+  if (profile) {
+    installProfiler(context);
+  }
 
   console.log(`Depth: ${depth}`);
   console.log(`FEN: ${fen}`);
   console.log("Start test move calculation:");
 
-  const result = runPerft(context, depth, fen);
+  const result = runPerft(context, depth, fen, profile);
 
   console.log(`${depth}: ${result.stats}`);
   console.log(`Nodes: ${result.nodes}`);
   console.log(`Time: ${result.elapsedMs} ms`);
+  console.log(
+    `NPS: ${Math.round((result.nodes / Math.max(result.elapsedMs, 0.001)) * 1000)}`
+  );
+  if (result.profile) {
+    console.log("Profile:");
+    for (const metric of result.profile) {
+      console.log(
+        [
+          metric.label.padEnd(48),
+          String(metric.calls).padStart(8) + " calls",
+          String(metric.totalMs).padStart(10) + " ms",
+          String(metric.avgMs).padStart(8) + " ms/call",
+          String(metric.percent).padStart(6) + "%",
+        ].join("  ")
+      );
+    }
+  }
   console.log(`Final FEN: ${result.finalFen}`);
 }
 

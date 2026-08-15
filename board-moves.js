@@ -695,58 +695,107 @@ class LegalMoves {
     const legalMovesForKing = this.getMovesFrom(
       this.boardData.getKingPosition(color)
     );
+    const opponentColor = color ^ Piece.COLOR_MASK;
     for (const moveOfKing of legalMovesForKing) {
       moveOfKing.makeMove();
-      const opponentColor = color ^ Piece.COLOR_MASK;
-      const newMoves =
-        this.myOpponentLegalMoves(color).generateMoves(opponentColor);
-      moveOfKing.undoLastMove();
-      if (
-        newMoves.find(
-          (x) =>
-            x.to === moveOfKing.to &&
-            x.isHit &&
-            x.targetPieceOnly === Piece.KING
-        )
-      ) {
-        this.moves = this.moves.filter((x) => !x.eqFromTo(moveOfKing));
-      }
-      // old algo: not covering new moves for check - check if any opponent move target at the legal move target
-      /*
-      let hasAnyCheck = this.myOpponentLegalMoves(color).hasAnyMoveToIndex(
-        moveOfKing.to
+      const kingInCheck = this.boardData.isIndexAttackedByColor(
+        moveOfKing.to,
+        opponentColor
       );
-      if (hasAnyCheck) {
+      moveOfKing.undoLastMove();
+      if (kingInCheck) {
         this.moves = this.moves.filter((x) => !x.eqFromTo(moveOfKing));
       }
-      */
     }
   }
 
   // checkout: http://127.0.0.1:5500/#r3k3/1p3p2/p2q2p1/bn3P2/1N2PQP1/PB6/3K1R1r/3R4%20w%20KQkq%20-%200%201
 
   limitingMovementPinnedPieces() {
-    // current legal moves: check for all moves if opponent offers new attacks to king if piece would move away
-    const movesOfNotKing = this.moves.filter((x) => x.pieceOnly != Piece.KING);
+    const pinnedPieces = this.findPinnedPieces();
     this.checkAttackOnPinnedPieces = [];
-    const movesToRemove = [];
-    for (const move of movesOfNotKing) {
-      move.makeMove();
-      let newMoves = this.boardData.opponentLegalMoves.generateMoves();
-      newMoves = newMoves.filter(
-        (x) => x.isHit && x.targetPieceOnly === Piece.KING
-      );
-      move.undoLastMove();
-      if (newMoves.length > 0) {
-        this.checkAttackOnPinnedPieces.push(
-          ...newMoves.flatMap((x) => x.getIndexes())
-        );
-        movesToRemove.push(move);
+
+    this.moves = this.moves.filter((move) => {
+      if (move.pieceOnly === Piece.KING) return true;
+
+      if (move.enPassant) {
+        const keepMove = !this.moveExposesKing(move);
+        if (!keepMove) {
+          this.checkAttackOnPinnedPieces.push(move.from, move.to);
+        }
+        return keepMove;
+      }
+
+      const pinnedPiece = pinnedPieces[move.from];
+      if (!pinnedPiece) return true;
+
+      const keepMove = pinnedPiece.allowedTargetIndexes.includes(move.to);
+      if (!keepMove) {
+        this.checkAttackOnPinnedPieces.push(...pinnedPiece.attackLine);
+      }
+      return keepMove;
+    });
+  }
+
+  moveExposesKing(move) {
+    move.makeMove();
+    const kingInCheck = this.boardData.isKingInCheck(this.color);
+    move.undoLastMove();
+    return kingInCheck;
+  }
+
+  findPinnedPieces() {
+    const kingIndex = this.boardData.getKingPosition(this.color);
+    const pinnedPieces = {};
+
+    for (
+      let directionIndex = 0;
+      directionIndex < directionOffsets.length;
+      directionIndex++
+    ) {
+      const distanceToTarget = distanceToEdge[kingIndex][directionIndex];
+      if (!distanceToTarget) continue;
+
+      const directionOffset = directionOffsets[directionIndex];
+      const maxDistance = Math.abs(distanceToTarget);
+      const attackLine = [];
+      let pinnedIndex = undefined;
+
+      for (let distance = 1; distance <= maxDistance; distance++) {
+        const index = kingIndex + directionOffset * distance;
+        attackLine.push(index);
+        const piece = this.boardData.getPiece(index);
+        if (piece === Piece.None) continue;
+
+        const pieceColor = piece & Piece.COLOR_MASK;
+        if (pieceColor === this.color) {
+          if (pinnedIndex !== undefined) break;
+          pinnedIndex = index;
+          continue;
+        }
+
+        if (
+          pinnedIndex !== undefined &&
+          this.isSlidingAttackOnDirection(piece, directionIndex)
+        ) {
+          pinnedPieces[pinnedIndex] = {
+            allowedTargetIndexes: attackLine.slice(),
+            attackLine: attackLine.slice(),
+          };
+        }
+        break;
       }
     }
-    if (movesToRemove) {
-      this.moves = this.moves.filter((x) => !x.isPartOf(movesToRemove));
+
+    return pinnedPieces;
+  }
+
+  isSlidingAttackOnDirection(piece, directionIndex) {
+    const pieceOnly = piece & Piece.PIECES_MASK;
+    if (directionIndex < 4) {
+      return pieceOnly === Piece.ROOK || pieceOnly === Piece.QUEEN;
     }
+    return pieceOnly === Piece.BISHOP || pieceOnly === Piece.QUEEN;
   }
 
   removePseudoIllegalMoves(movesToCheck) {
