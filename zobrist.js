@@ -10,6 +10,48 @@ if (typeof window === "undefined") {
     });
 }
 
+/*
+ * Old runtime key generation method. Not needed anymore because
+ * zobrist-keys.js now contains the generated deterministic table.
+ *
+ * function createPRNG(seed) {
+ *   let state = seed || 29426028;
+ *
+ *   return function () {
+ *     state ^= state << 13;
+ *     state ^= state >> 17;
+ *     state ^= state << 5;
+ *     return state >>> 0;
+ *   };
+ * }
+ *
+ * const random = createPRNG();
+ *
+ * random64() {
+ *   return (BigInt(random()) << 32n) | BigInt(random());
+ * }
+ *
+ * initializeZobristTable() {
+ *   const pieceTypes = [
+ *     Piece.PAWN,
+ *     Piece.KNIGHT,
+ *     Piece.BISHOP,
+ *     Piece.ROOK,
+ *     Piece.QUEEN,
+ *     Piece.KING,
+ *   ];
+ *   const whitePieces = pieceTypes.map((x) => x | Piece.WHITE);
+ *   const blackPieces = pieceTypes.map((x) => x | Piece.BLACK);
+ *   const pieces = whitePieces.concat(blackPieces);
+ *   const squareCount = 64;
+ *   const table = [];
+ *   for (const piece of pieces) {
+ *     table[piece] = Array.from({ length: squareCount }, () => this.random64());
+ *   }
+ *   return table;
+ * }
+ */
+
 class Zobrist {
   constructor() {
     if (typeof ZOBRIST_KEYS === "undefined") {
