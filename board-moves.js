@@ -53,7 +53,7 @@ class Move {
   }
 
   clone() {
-    return new Move(
+    const move = new Move(
       this.board,
       this.from,
       this.to,
@@ -64,6 +64,8 @@ class Move {
       this.castlingRookStartIndex,
       this.castlingRookTargetIndex
     );
+    move.promotionPiece = this.promotionPiece;
+    return move;
   }
 
   eq(other) {

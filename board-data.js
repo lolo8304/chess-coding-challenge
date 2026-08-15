@@ -32,8 +32,11 @@ class BoardData {
     this.legalMovesForSelectedIndex = [];
     this.currentEnPassantTarget = undefined;
     this.hashCache = {};
-    this.resetSquares(fen);
     this.result = undefined;
+    this.positionRepetitionLimit = 3;
+    this.positionRepetitionCounts = new Map();
+    this.resetSquares(fen);
+    this.recordCurrentPositionForRepetition();
   }
 
   newHash(color) {
@@ -57,6 +60,83 @@ class BoardData {
 
   invalidateHash() {
     this.hashCache = {};
+  }
+
+  repetitionKey(hash) {
+    return hash.toString();
+  }
+
+  repetitionCountForHash(hash) {
+    return this.positionRepetitionCounts.get(this.repetitionKey(hash)) || 0;
+  }
+
+  recordCurrentPositionForRepetition() {
+    const hash = this.newHash(this.legalMoves.color);
+    this.addPositionToRepetition(hash);
+    return hash;
+  }
+
+  addPositionToRepetition(hash) {
+    const key = this.repetitionKey(hash);
+    this.positionRepetitionCounts.set(
+      key,
+      (this.positionRepetitionCounts.get(key) || 0) + 1
+    );
+  }
+
+  removePositionFromRepetition(hash) {
+    if (hash === undefined) return;
+    const key = this.repetitionKey(hash);
+    const count = this.positionRepetitionCounts.get(key) || 0;
+    if (count <= 1) {
+      this.positionRepetitionCounts.delete(key);
+    } else {
+      this.positionRepetitionCounts.set(key, count - 1);
+    }
+  }
+
+  previewHashAfterMove(move) {
+    const previewMove = move.clone();
+    const newColor = previewMove.color ^ Piece.COLOR_MASK;
+    const selectedIndex = this.selectedIndex;
+    const check = this.check;
+    const checkMate = this.checkMate;
+    const result = this.result;
+
+    this.makeMove(previewMove, false);
+    const hash = this.newHash(newColor);
+    this.undoMove(previewMove);
+
+    this.selectedIndex = selectedIndex;
+    this.check = check;
+    this.checkMate = checkMate;
+    this.result = result;
+    return hash;
+  }
+
+  isMoveInvalidByRepetition(move, limit = this.positionRepetitionLimit) {
+    if (!limit || limit < 2) return false;
+    const hash = this.previewHashAfterMove(move);
+    return this.repetitionCountForHash(hash) + 1 >= limit;
+  }
+
+  removeMovesInvalidByRepetition() {
+    const moves = this.legalMoves.moves;
+    if (moves.length === 0) return;
+
+    const validMoves = [];
+    for (const move of moves) {
+      if (this.isMoveInvalidByRepetition(move)) {
+        move.repetitionInvalid = true;
+      } else {
+        validMoves.push(move);
+      }
+    }
+    this.legalMoves.moves = validMoves;
+    if (validMoves.length === 0) {
+      this.result =
+        "DRAW - repeated position " + this.positionRepetitionLimit + " times";
+    }
   }
 
   enPassantFileForHash(enPassantTarget = this.currentEnPassantTarget) {
@@ -434,6 +514,7 @@ class BoardData {
       this.legalMoves.removePseudoIllegalMoves(movesToCheckFromMe);
     }
     this.legalMoves.removePseudoIllegalMovesForMyKing(color);
+    this.removeMovesInvalidByRepetition();
 
     if (this.selectedIndex != NOT_SELECTED) {
       this.legalMovesForSelectedIndex = this.legalMoves.getMovesFrom(
@@ -442,7 +523,7 @@ class BoardData {
     } else {
       this.legalMovesForSelectedIndex = [];
     }
-    if (this.legalMoves.moves.length === 0) {
+    if (this.legalMoves.moves.length === 0 && this.result === undefined) {
       this.checkMate = true;
       if (this.check) {
         this.result =
@@ -784,6 +865,7 @@ class BoardData {
       this.halfMoveCounter = undoMove.halfMoveCounter;
       this.nextFullMoveCounter = undoMove.nextFullMoveCounter;
       this.currentEnPassantTarget = undoMove.currentEnPassantTarget;
+      this.removePositionFromRepetition(undoMove.repetitionHash);
     }
     this.hashCache = undoMove?.hashCache || {};
     this.check = false;
@@ -822,10 +904,19 @@ class BoardData {
     this.hashCache[newColor] = newHash;
     this.selectCellIndex(NOT_SELECTED);
     if (withHalfMoves) {
+      move.undoMove.repetitionHash = newHash;
+      const repetitionCount = this.repetitionCountForHash(newHash) + 1;
+      this.addPositionToRepetition(newHash);
       if (move.pieceOnly === Piece.PAWN || move.isHit) {
         this.resetHalfMoveCounter();
       } else {
         this.incHalfMoveCounter();
+      }
+      if (repetitionCount >= this.positionRepetitionLimit) {
+        this.result =
+          "DRAW - repeated position " +
+          this.positionRepetitionLimit +
+          " times";
       }
       if (this.halfMoveCounter === 100) {
         const confirmed = window.confirm(
