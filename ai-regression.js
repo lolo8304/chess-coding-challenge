@@ -24,6 +24,27 @@ const TESTS = [
     initialGameColor: "black",
   },
   {
+    name: "principal variation reports searched line",
+    fen: "k7/4q3/8/8/8/8/8/4R2K w - - 0 1",
+    depth: 3,
+    directSearch: true,
+    expectedMove: "e1e7",
+    expectedPrincipalVariationFirst: "e1e7",
+    expectedPrincipalVariationMinLength: 1,
+    initialGameColor: "black",
+  },
+  {
+    name: "stale castling move is rejected",
+    fen: "r1bk3r/pppp1ppp/4p3/4P3/4NbqN/P2P2P1/1PQ3BP/R3K2R w - - 4 3",
+    staleMoveFen:
+      "r1bk3r/pppp1ppp/4p3/4P3/4NbqN/P2P2P1/1PQ3BP/R3K2R w KQkq - 4 3",
+    staleMove: "e1g1",
+    depth: 3,
+    expectIllegalMove: true,
+    expectedLegalMoves: 40,
+    initialGameColor: "black",
+  },
+  {
     name: "forced reply while in check",
     fen: "4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",
     depth: 3,
@@ -183,7 +204,24 @@ function runSearchTest(test) {
         const legalMovesBefore = data.legalMoves.moves.length;
 
         let result;
-        if (aiSearchTest.quiescenceOnly) {
+        if (aiSearchTest.expectIllegalMove) {
+          const staleData = new BoardData(new History(), aiSearchTest.staleMoveFen);
+          const staleTurn = staleData.legalMoves.color;
+          staleData.setLegalMovesFor(staleTurn);
+          const staleMove = staleData.legalMoves.moves.find(
+            (move) => move.toCoordinateNotation() === aiSearchTest.staleMove
+          );
+          let illegalMoveRejected = false;
+          try {
+            data.makeMove(staleMove, true);
+          } catch (error) {
+            illegalMoveRejected = error.message.startsWith("Illegal move ");
+          }
+          result = {
+            bestMove: undefined,
+            illegalMoveRejected,
+          };
+        } else if (aiSearchTest.quiescenceOnly) {
           const evaluator = new Evaluator(
             TranspositionTableInstance(),
             data,
@@ -209,6 +247,18 @@ function runSearchTest(test) {
             true,
             aiSearchTest.timeLimitMilliseconds
           );
+        } else if (aiSearchTest.directSearch) {
+          const evaluator = new Evaluator(
+            TranspositionTableInstance(),
+            data,
+            turn
+          );
+          result = evaluator.searchAlphaBetaPruningAll(
+            aiSearchTest.depth,
+            -Infinity,
+            Infinity,
+            true
+          );
         } else {
           const player = evaluators.newPlayerOn("alpha-beta", data, turn);
           const move = player.chooseMove();
@@ -228,6 +278,21 @@ function runSearchTest(test) {
           actualCount: result.count,
           expectedCutOffs: aiSearchTest.expectedCutOffs,
           actualCutOffs: result.cutOffs,
+          expectedPrincipalVariationFirst:
+            aiSearchTest.expectedPrincipalVariationFirst,
+          actualPrincipalVariationFirst:
+            result.principalVariation &&
+            result.principalVariation[0] &&
+            result.principalVariation[0].toCoordinateNotation(),
+          expectedPrincipalVariationMinLength:
+            aiSearchTest.expectedPrincipalVariationMinLength,
+          actualPrincipalVariationLength: result.principalVariation
+            ? result.principalVariation.length
+            : undefined,
+          expectedIllegalMoveRejected: aiSearchTest.expectIllegalMove
+            ? true
+            : undefined,
+          actualIllegalMoveRejected: result.illegalMoveRejected,
           expectedCompletedDepth: aiSearchTest.expectedCompletedDepth,
           actualCompletedDepth: result.completedDepth,
           expectedTimedOut: aiSearchTest.expectedTimedOut,
@@ -289,6 +354,31 @@ function checkResult(result) {
       "cutoff count",
       result.actualCutOffs,
       result.expectedCutOffs
+    );
+  }
+  if (result.expectedPrincipalVariationFirst !== undefined) {
+    assertEqual(
+      failures,
+      "principal variation first move",
+      result.actualPrincipalVariationFirst,
+      result.expectedPrincipalVariationFirst
+    );
+  }
+  if (
+    result.expectedPrincipalVariationMinLength !== undefined &&
+    result.actualPrincipalVariationLength <
+      result.expectedPrincipalVariationMinLength
+  ) {
+    failures.push(
+      `principal variation length: expected at least ${result.expectedPrincipalVariationMinLength}, got ${result.actualPrincipalVariationLength}`
+    );
+  }
+  if (result.expectedIllegalMoveRejected !== undefined) {
+    assertEqual(
+      failures,
+      "illegal move rejected",
+      result.actualIllegalMoveRejected,
+      result.expectedIllegalMoveRejected
     );
   }
   if (result.expectedCompletedDepth !== undefined) {

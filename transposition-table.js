@@ -76,7 +76,14 @@ class TranspositionTable {
   }
 
   // Store an entry in the table
-  store(hash, depth, evaluation, flag, bestMove = undefined) {
+  store(
+    hash,
+    depth,
+    evaluation,
+    flag,
+    bestMove = undefined,
+    principalVariation = []
+  ) {
     const index = this.getIndex(hash);
 
     const entry = this.table[index];
@@ -103,6 +110,7 @@ class TranspositionTable {
       evaluation,
       flag,
       bestMove,
+      principalVariation,
     };
   }
 
@@ -182,6 +190,7 @@ class TranspositionTable {
           return {
             evaluation: entry.evaluation,
             bestMove: entry.bestMove,
+            principalVariation: entry.principalVariation || [],
           };
 
         case "LOWERBOUND":
@@ -202,6 +211,7 @@ class TranspositionTable {
         return {
           evaluation: entry.evaluation,
           bestMove: entry.bestMove,
+          principalVariation: entry.principalVariation || [],
         };
       }
       this.boundNotUseful++;

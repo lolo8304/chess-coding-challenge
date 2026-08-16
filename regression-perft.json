@@ -269,6 +269,27 @@
       ]
     },
     {
+      "name": "chat-stale-e1g1-castling-without-rights",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "r1bk3r/pppp1ppp/4p3/4P3/4NbqN/P2P2P1/1PQ3BP/R3K2R w - - 4 3",
+      "expectedRootMovesExclude": [
+        "e1g1"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 40,
+          "castles": 0
+        },
+        {
+          "depth": 2,
+          "nodes": 1422,
+          "castles": 0
+        }
+      ]
+    },
+    {
       "name": "chess960-001",
       "variant": "chess960",
       "source": "https://chessprogramming.org/Chess960_Perft_Results",

@@ -119,8 +119,10 @@ class ComputerPlayerAlphaBetaPruning extends ComputerPlayer {
     verbose === 1 &&
       console.log("Count Evaluations: " + evalutator.countEvaluated);
     //console.log("Search: count=" + count + ", cuts: " + cutOffs);
-    if (bestMove && legalMoves.moves.find((move) => move.eq(bestMove))) {
-      return bestMove;
+    const legalBestMove =
+      bestMove && legalMoves.moves.find((move) => move.eq(bestMove));
+    if (legalBestMove) {
+      return legalBestMove;
     }
     return legalMoves.moves[0];
   }
@@ -255,7 +257,14 @@ class Evaluator {
         first: 0,
         cutoff: 0,
       },
+      principalVariation: {
+        available: 0,
+        legal: 0,
+        first: 0,
+        cutoff: 0,
+      },
     };
+    this.principalVariation = [];
   }
 
   createCutoffSourceStats() {
@@ -265,6 +274,7 @@ class Evaluator {
       promotion: 0,
       killer: 0,
       history: 0,
+      principalVariation: 0,
       standPat: 0,
       other: 0,
     };
@@ -467,6 +477,7 @@ class Evaluator {
         break;
       }
       result = depthResult;
+      this.principalVariation = depthResult.principalVariation || [];
       completedDepth = currentDepth;
       totalCount += depthResult.count;
       totalCutOffs += depthResult.cutOffs;
@@ -481,7 +492,9 @@ class Evaluator {
             ", count=" +
             depthResult.count +
             ", cuts=" +
-            depthResult.cutOffs
+            depthResult.cutOffs +
+            ", pv=" +
+            this.formatPrincipalVariation(depthResult.principalVariation)
         );
     }
     const diffTime = Math.round(deadline.elapsedMilliseconds());
@@ -497,6 +510,8 @@ class Evaluator {
           totalCutOffs +
           ", eval=" +
           result?.evaluation +
+          ", pv=" +
+          this.formatPrincipalVariation(result?.principalVariation) +
           ", depth=" +
           completedDepth +
           "/" +
@@ -515,6 +530,7 @@ class Evaluator {
       evaluation: result?.evaluation,
       count: totalCount,
       cutOffs: totalCutOffs,
+      principalVariation: result?.principalVariation || [],
       completedDepth,
       timedOut: deadline.timedOut,
     };
@@ -557,6 +573,7 @@ class Evaluator {
         evaluation: undefined,
         count: 0,
         cutOffs: 0,
+        principalVariation: [],
         timedOut: true,
       };
     }
@@ -577,6 +594,7 @@ class Evaluator {
         evaluation: evaluation,
         count: 1,
         cutOffs: 0,
+        principalVariation: [],
         timedOut: false,
       };
     }
@@ -589,11 +607,15 @@ class Evaluator {
           evaluation: ttResult.evaluation,
           count: 1,
           cutOffs: 0,
+          principalVariation: ttResult.principalVariation || [],
           timedOut: false,
         };
       }
     }
-    const ttBestMove = capturesOnly
+    const principalVariationMove = capturesOnly
+      ? undefined
+      : this.principalVariation[ply];
+    const ttBestMove = capturesOnly || principalVariationMove
       ? undefined
       : this.tt.bestMoveForOrdering(newHash);
     let moves = [...this.data.legalMoves.moves];
@@ -604,8 +626,13 @@ class Evaluator {
       }
       moves = captureMoves;
     }
-    moves = this.orderMoves(moves, ttBestMove, ply);
-    this.recordTTBestMoveStats(ttBestMove, moves);
+    moves = this.orderMoves(moves, principalVariationMove, ttBestMove, ply);
+    this.recordPreferredMoveStats(
+      principalVariationMove,
+      moves,
+      "principalVariation"
+    );
+    this.recordPreferredMoveStats(ttBestMove, moves, "ttBestMove");
     let minMaxEval = 0;
     let totalCount = 0;
     let totalCutOffs = 0;
@@ -622,6 +649,7 @@ class Evaluator {
             evaluation: standPat,
             count: totalCount,
             cutOffs: 1,
+            principalVariation: [],
             timedOut: false,
           };
         }
@@ -640,6 +668,7 @@ class Evaluator {
             evaluation: standPat,
             count: totalCount,
             cutOffs: 1,
+            principalVariation: [],
             timedOut: false,
           };
         }
@@ -656,6 +685,7 @@ class Evaluator {
             : CHECKMATE_EVALUATION + depth,
           count: 1,
           cutOffs: 0,
+          principalVariation: [],
           timedOut: false,
         };
       }
@@ -665,6 +695,7 @@ class Evaluator {
           evaluation: minMaxEval,
           count: totalCount,
           cutOffs: totalCutOffs,
+          principalVariation: [],
           timedOut: false,
         };
       }
@@ -673,11 +704,13 @@ class Evaluator {
         evaluation: 0,
         count: 1,
         cutOffs: 0,
+        principalVariation: [],
         timedOut: false,
       };
     }
 
     let currentBestMove = undefined;
+    let currentPrincipalVariation = [];
     const origColor = colorToMove;
     for (let indexMove = 0; indexMove < moves.length; indexMove++) {
       if (deadline?.isExpired()) {
@@ -686,6 +719,7 @@ class Evaluator {
           evaluation: minMaxEval,
           count: totalCount,
           cutOffs: totalCutOffs,
+          principalVariation: currentPrincipalVariation,
           timedOut: true,
         };
       }
@@ -712,7 +746,7 @@ class Evaluator {
             ")"
         );
 
-      let { bestMove, evaluation, count, cutOffs } =
+      let { bestMove, evaluation, count, cutOffs, principalVariation } =
         this.searchAlphaBetaPruning(
           capturesOnly,
           depth - 1,
@@ -735,6 +769,7 @@ class Evaluator {
           evaluation: minMaxEval,
           count: totalCount,
           cutOffs: totalCutOffs,
+          principalVariation: currentPrincipalVariation,
           timedOut: true,
         };
       }
@@ -744,6 +779,10 @@ class Evaluator {
       if (maximizingPlayer) {
         if (evaluation > minMaxEval) {
           currentBestMove = move;
+          currentPrincipalVariation = this.buildPrincipalVariation(
+            move,
+            principalVariation
+          );
         }
         minMaxEval = Math.max(minMaxEval, evaluation);
         alpha = Math.max(alpha, evaluation);
@@ -754,6 +793,10 @@ class Evaluator {
       } else {
         if (evaluation < minMaxEval) {
           currentBestMove = move;
+          currentPrincipalVariation = this.buildPrincipalVariation(
+            move,
+            principalVariation
+          );
         }
         minMaxEval = Math.min(minMaxEval, evaluation);
         beta = Math.min(beta, evaluation);
@@ -795,7 +838,8 @@ class Evaluator {
             depth,
             minMaxEval,
             transpositionFlag,
-            currentBestMove
+            currentBestMove,
+            currentPrincipalVariation
           );
         }
         return {
@@ -803,6 +847,7 @@ class Evaluator {
           evaluation: minMaxEval,
           count: totalCount,
           cutOffs: totalCutOffs,
+          principalVariation: currentPrincipalVariation,
           timedOut: false,
         };
       } else {
@@ -828,7 +873,8 @@ class Evaluator {
         depth,
         minMaxEval,
         TranspositionFlag.EXACT,
-        currentBestMove
+        currentBestMove,
+        currentPrincipalVariation
       );
     }
     return {
@@ -836,8 +882,13 @@ class Evaluator {
       evaluation: minMaxEval,
       count: totalCount,
       cutOffs: totalCutOffs,
+      principalVariation: currentPrincipalVariation,
       timedOut: false,
     };
+  }
+
+  buildPrincipalVariation(move, childPrincipalVariation) {
+    return [move].concat(childPrincipalVariation || []);
   }
 
   recordCutoffSource(move, depth, capturesOnly) {
@@ -852,6 +903,8 @@ class Evaluator {
     this.searchStats.cutoffSourcesByMode[mode][source]++;
     if (source === "ttBestMove") {
       this.searchStats.ttBestMove.cutoff++;
+    } else if (source === "principalVariation") {
+      this.searchStats.principalVariation.cutoff++;
     }
   }
 
@@ -866,20 +919,20 @@ class Evaluator {
     this.searchStats.cutoffSourcesByMode[mode].standPat++;
   }
 
-  recordTTBestMoveStats(ttBestMove, moves) {
-    if (!ttBestMove) return;
-    this.searchStats.ttBestMove.available++;
+  recordPreferredMoveStats(preferredMove, moves, statsName) {
+    if (!preferredMove) return;
+    this.searchStats[statsName].available++;
     let legalIndex = -1;
     for (let i = 0; i < moves.length; i++) {
-      if (moves[i].eqFromTo(ttBestMove)) {
+      if (moves[i].eqFromTo(preferredMove)) {
         legalIndex = i;
         break;
       }
     }
     if (legalIndex === -1) return;
-    this.searchStats.ttBestMove.legal++;
+    this.searchStats[statsName].legal++;
     if (legalIndex === 0) {
-      this.searchStats.ttBestMove.first++;
+      this.searchStats[statsName].first++;
     }
   }
 
@@ -888,6 +941,7 @@ class Evaluator {
     const mainSources = this.searchStats.cutoffSourcesByMode.main;
     const quiescenceSources = this.searchStats.cutoffSourcesByMode.quiescence;
     const ttBestMove = this.searchStats.ttBestMove;
+    const principalVariation = this.searchStats.principalVariation;
     console.log(
       "Cutoff sources: " +
         this.formatCutoffSources(sources)
@@ -912,6 +966,16 @@ class Evaluator {
         ", cutoff=" +
         ttBestMove.cutoff
     );
+    console.log(
+      "PV ordering: available=" +
+        principalVariation.available +
+        ", legal=" +
+        principalVariation.legal +
+        ", first=" +
+        principalVariation.first +
+        ", cutoff=" +
+        principalVariation.cutoff
+    );
   }
 
   formatCutoffSources(sources) {
@@ -926,6 +990,8 @@ class Evaluator {
       sources.killer +
       ", history=" +
       sources.history +
+      ", principalVariation=" +
+      sources.principalVariation +
       ", standPat=" +
       sources.standPat +
       ", other=" +
@@ -944,11 +1010,26 @@ class Evaluator {
     return parts.join("; ");
   }
 
-  orderMoves(moves, ttBestMove = undefined, ply = 0) {
+  formatPrincipalVariation(principalVariation) {
+    if (!principalVariation || principalVariation.length === 0) return "-";
+    return principalVariation
+      .map((move) => move.toCoordinateNotation())
+      .join(" ");
+  }
+
+  orderMoves(
+    moves,
+    principalVariationMove = undefined,
+    ttBestMove = undefined,
+    ply = 0
+  ) {
     for (const move of moves) {
       let moveScoreGuess = 0;
       let cutoffSource = "other";
-      if (ttBestMove && move.eqFromTo(ttBestMove)) {
+      if (principalVariationMove && move.eqFromTo(principalVariationMove)) {
+        moveScoreGuess += 2000000000;
+        cutoffSource = "principalVariation";
+      } else if (ttBestMove && move.eqFromTo(ttBestMove)) {
         moveScoreGuess += 1000000000;
         cutoffSource = "ttBestMove";
       }
