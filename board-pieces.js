@@ -17,8 +17,19 @@ const Piece = {
 
   COLOR_MASK: 24,
 };
-const MAX_DEPTH = 4;
+const MAX_DEPTH = 7;
 let calculationDepth = MAX_DEPTH;
+const DEFAULT_AI_SEARCH_TIME_LIMIT_MILLISECONDS = 1200;
+let aiSearchTimeLimitMilliseconds = DEFAULT_AI_SEARCH_TIME_LIMIT_MILLISECONDS;
+const DEFAULT_AI_SEARCH_STRENGTH_PRESET = "club";
+let aiSearchStrengthPreset = DEFAULT_AI_SEARCH_STRENGTH_PRESET;
+const AI_SEARCH_STRENGTH_PRESETS = {
+  beginner: { maxDepth: 4, timeLimitMilliseconds: 400 },
+  casual: { maxDepth: 5, timeLimitMilliseconds: 700 },
+  club: { maxDepth: 7, timeLimitMilliseconds: 1200 },
+  strong: { maxDepth: 7, timeLimitMilliseconds: 2000 },
+  analysis: { maxDepth: 7, timeLimitMilliseconds: 5000 },
+};
 
 function getCalculationDepth() {
   return calculationDepth;
@@ -30,6 +41,32 @@ function setCalculationDepth(depth) {
     calculationDepth = parsedDepth;
   }
   return calculationDepth;
+}
+
+function getAiSearchTimeLimitMilliseconds() {
+  return aiSearchTimeLimitMilliseconds;
+}
+
+function setAiSearchTimeLimitMilliseconds(milliseconds) {
+  const parsedMilliseconds = parseInt(milliseconds, 10);
+  if (Number.isFinite(parsedMilliseconds) && parsedMilliseconds >= 0) {
+    aiSearchTimeLimitMilliseconds = parsedMilliseconds;
+  }
+  return aiSearchTimeLimitMilliseconds;
+}
+
+function getAiSearchStrengthPreset() {
+  return aiSearchStrengthPreset;
+}
+
+function setAiSearchStrengthPreset(name) {
+  const preset = AI_SEARCH_STRENGTH_PRESETS[name];
+  if (preset) {
+    aiSearchStrengthPreset = name;
+    setCalculationDepth(preset.maxDepth);
+    setAiSearchTimeLimitMilliseconds(preset.timeLimitMilliseconds);
+  }
+  return aiSearchStrengthPreset;
 }
 
 const SlidingPieces = [Piece.BISHOP, Piece.ROOK, Piece.QUEEN];
