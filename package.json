@@ -1,5 +1,9 @@
 {
   "private": true,
+  "scripts": {
+    "test": "./ai-regression.sh && ./regression-perft.sh 2 \"\" 20",
+    "test-full": "./ai-regression.sh && ./regression-perft.sh"
+  },
   "engines": {
     "node": "24.x"
   }
