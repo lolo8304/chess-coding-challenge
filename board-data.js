@@ -218,6 +218,11 @@ class BoardData {
   addCastlingRightIfAvailable(rights, right, color, side) {
     const kingPiece = Piece.KING | color;
     if (this.history.hasMoved(kingPiece)) return;
+    const kingIndex = this.getKingPosition(color);
+    const homeRank = color === Piece.WHITE ? 7 : 0;
+    if (kingIndex === undefined || Math.floor(kingIndex / 8) !== homeRank) {
+      return;
+    }
 
     const rookStartIndex = this.castlingRookStartIndexes[color][side];
     if (rookStartIndex === undefined) return;
