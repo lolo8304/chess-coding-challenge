@@ -76,10 +76,19 @@ class Game {
         turnText = "WHITE won - timeout";
       }
     }
-    if (this.board.data.isFinished()) {
-      fill("red");
-      rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
+    const phase = this.effectivePhase();
+    let bannerBackgroundColor = this.color === Piece.WHITE ? "white" : "black";
+    let bannerTextColor = this.color === Piece.WHITE ? "black" : "white";
+    if (phase === "waiting") {
+      bannerBackgroundColor = "black";
+      bannerTextColor = "white";
     }
+    if (phase === "end" || this.board.data.isFinished()) {
+      bannerBackgroundColor = "red";
+      bannerTextColor = "white";
+    }
+    fill(bannerBackgroundColor);
+    rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
     const fontSize = this.w > 600 ? 40 : this.w > 400 ? 30 : 20;
     const clockFontSize = this.w > 600 ? 22 : this.w > 400 ? 18 : 14;
     const bannerMiddleY =
@@ -90,15 +99,22 @@ class Game {
       this.paddingTop / 2 +
       (clockFontSize - 10) / 2;
     textSize(fontSize);
-    fill("white");
+    fill(bannerTextColor);
     textAlign(CENTER);
     text(turnText, this.x + this.w / 2, bannerMiddleY);
-    this.drawClock(Piece.WHITE, "left", this.x + this.padding, clockY);
+    this.drawClock(
+      Piece.WHITE,
+      "left",
+      this.x + this.padding,
+      clockY,
+      bannerTextColor
+    );
     this.drawClock(
       Piece.BLACK,
       "right",
       this.x + this.w - this.padding,
-      clockY
+      clockY,
+      bannerTextColor
     );
     if (!this.board.data.isFinished()) {
       if (this.time > 1.0) {
@@ -160,10 +176,10 @@ class Game {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
 
-  drawClock(color, align, x, y) {
+  drawClock(color, align, x, y, textColor) {
     const label = this.formatClockMilliseconds(this.remainingMilliseconds(color));
     const clockFontSize = this.w > 600 ? 22 : this.w > 400 ? 18 : 14;
-    fill("white");
+    fill(textColor);
     textSize(clockFontSize);
     textAlign(CENTER);
     const clockHalfWidth = clockFontSize * 1.5;
