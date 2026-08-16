@@ -201,6 +201,21 @@ The reported Elo is a match-performance estimate against the selected
 Stockfish Elo. Use more games and several opponent Elo levels for a more stable
 number.
 
+## Elo Calculator History
+
+Append a depth-4 Elo run to `elo-results.csv` after an optimization:
+
+```sh
+./elo-calculator.sh
+```
+
+Each run appends one CSV line with `timestamp`, `results`, `calculated_elo`,
+`depth`, and `stockfish_elo`. Use `ELO_RESULTS_FILE` to write to another file:
+
+```sh
+ELO_RESULTS_FILE=elo-history.csv GAMES=20 STOCKFISH_ELO=1400 ./elo-calculator.sh
+```
+
 ## Save Stockfish Games
 
 Write replay data while running Elo matches:

@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "test": "./ai-regression.sh && ./regression-perft.sh 2 \"\" 20",
-    "test-full": "./ai-regression.sh && ./regression-perft.sh"
+    "test-full": "./ai-regression.sh && ./regression-perft.sh 2"
   },
   "engines": {
     "node": "24.x"
