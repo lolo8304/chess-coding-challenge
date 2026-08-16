@@ -842,11 +842,24 @@ class BoardData {
     this.halfMoveCounter++;
     this.nextFullMoveCounter = Math.floor(this.halfMoveCounter / 2) + 1;
   }
+  hasClockExpired() {
+    if (
+      typeof game === "undefined" ||
+      !game ||
+      typeof game.remainingMilliseconds !== "function"
+    ) {
+      return false;
+    }
+    return (
+      game.remainingMilliseconds(Piece.BLACK) <= 0 ||
+      game.remainingMilliseconds(Piece.WHITE) <= 0
+    );
+  }
   isFinished() {
-    return this.result !== undefined || game.remainingMilliseconds(Piece.BLACK) <= 0 || game.remainingMilliseconds(Piece.WHITE) <= 0;
+    return this.result !== undefined || this.hasClockExpired();
   }
   isNotFinished() {
-    return this.result === undefined;
+    return !this.isFinished();
   }
 
   undoMove(move) {
