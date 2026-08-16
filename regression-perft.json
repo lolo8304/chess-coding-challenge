@@ -5,7 +5,7 @@
     "generatedFrom": "https://chessprogramming.org/Chess960_Perft_Results",
     "chess960CaseCount": 960,
     "note": "Default regression depth is intentionally 2; higher Chess960 depths are stored for manual targeted runs.",
-    "chatHistoryCaseCount": 3
+    "chatHistoryCaseCount": 4
   },
   "cases": [
     {
@@ -286,6 +286,26 @@
           "depth": 2,
           "nodes": 1422,
           "castles": 0
+        }
+      ]
+    },
+    {
+      "name": "chat-rook-check-king-e2e3-legal",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "r1b1RQ2/pp1p4/2k4p/2p5/5P2/8/r3K1P1/8 w - - 22 12",
+      "expectedRootMoves": [
+        "e2d1",
+        "e2e1",
+        "e2f1",
+        "e2d3",
+        "e2e3",
+        "e2f3"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 6
         }
       ]
     },

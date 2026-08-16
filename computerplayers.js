@@ -119,6 +119,8 @@ class ComputerPlayerAlphaBetaPruning extends ComputerPlayer {
     verbose === 1 &&
       console.log("Count Evaluations: " + evalutator.countEvaluated);
     //console.log("Search: count=" + count + ", cuts: " + cutOffs);
+    this.boardData.setLegalMovesFor(this.color);
+    legalMoves = this.boardData.legalMoves;
     const legalBestMove =
       bestMove && legalMoves.moves.find((move) => move.eq(bestMove));
     if (legalBestMove) {

@@ -53,6 +53,15 @@ const TESTS = [
     initialGameColor: "black",
   },
   {
+    name: "ai move remains legal after search from rook check",
+    fen: "r1b1RQ2/pp1p4/2k4p/2p5/5P2/8/r3K1P1/8 w - - 22 12",
+    depth: 4,
+    expectedMove: "e2f3",
+    expectedLegalMoves: 6,
+    expectedMadeMove: true,
+    initialGameColor: "white",
+  },
+  {
     name: "black capture keeps search state local",
     fen: "4r2k/8/8/8/8/8/4Q3/K7 b - - 0 1",
     depth: 3,
@@ -267,6 +276,19 @@ function runSearchTest(test) {
 
         const fenAfter = data.calculatedFen();
         const hashAfter = data.newHash(turn).toString();
+        let madeMove = undefined;
+        let makeMoveError = undefined;
+        if (aiSearchTest.expectedMadeMove) {
+          try {
+            data.makeMove(result.bestMove, true);
+            madeMove = true;
+            data.undoMove(result.bestMove);
+            data.setLegalMovesFor(turn);
+          } catch (error) {
+            madeMove = false;
+            makeMoveError = error.message;
+          }
+        }
 
         return {
           name: aiSearchTest.name,
@@ -297,6 +319,9 @@ function runSearchTest(test) {
           actualCompletedDepth: result.completedDepth,
           expectedTimedOut: aiSearchTest.expectedTimedOut,
           actualTimedOut: result.timedOut,
+          expectedMadeMove: aiSearchTest.expectedMadeMove,
+          actualMadeMove: madeMove,
+          makeMoveError,
           legalMovesBefore,
           turn,
           legalMovesColorAfter: data.legalMoves.color,
@@ -396,6 +421,17 @@ function checkResult(result) {
       result.actualTimedOut,
       result.expectedTimedOut
     );
+  }
+  if (result.expectedMadeMove !== undefined) {
+    assertEqual(
+      failures,
+      "AI move accepted by makeMove",
+      result.actualMadeMove,
+      result.expectedMadeMove
+    );
+    if (result.makeMoveError) {
+      failures.push(`makeMove error: ${result.makeMoveError}`);
+    }
   }
   return failures;
 }
