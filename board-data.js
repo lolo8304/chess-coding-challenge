@@ -891,7 +891,33 @@ class BoardData {
     this.result = undefined;
   }
 
+  legalMoveFor(move) {
+    if (!this.legalMoves || this.legalMoves.color !== move.color) {
+      this.setLegalMovesFor(move.color);
+    }
+    return this.legalMoves.moves.find((legalMove) => legalMove.eq(move));
+  }
+
+  assertLegalMove(move) {
+    const legalMove = this.legalMoveFor(move);
+    if (legalMove) return legalMove;
+    const legalMoveList = this.legalMoves.moves
+      .map((legalMove) => legalMove.toCoordinateNotation())
+      .join(", ");
+    throw new Error(
+      "Illegal move " +
+        move.toCoordinateNotation() +
+        " for position " +
+        this.calculatedFen() +
+        ". Legal moves: " +
+        legalMoveList
+    );
+  }
+
   makeMove(move, withHalfMoves) {
+    if (withHalfMoves) {
+      move = this.assertLegalMove(move);
+    }
     const oldColor = move.color;
     const newColor = oldColor ^ Piece.COLOR_MASK;
     const oldHash = this.newHash(oldColor);

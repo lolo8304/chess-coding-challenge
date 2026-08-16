@@ -73,14 +73,23 @@ class Move {
       other?.from === this.from &&
       other?.to === this.to &&
       other?.promotionPiece === this.promotionPiece &&
-      other?.isHit === this.isHit
+      other?.isHit === this.isHit &&
+      other?.enPassant === this.enPassant &&
+      other?.enPassantTarget === this.enPassantTarget &&
+      other?.castlingKingTargetIndex === this.castlingKingTargetIndex &&
+      other?.castlingRookStartIndex === this.castlingRookStartIndex &&
+      other?.castlingRookTargetIndex === this.castlingRookTargetIndex
     );
   }
   eqFromTo(other) {
     return (
       other?.from === this.from &&
       other?.to === this.to &&
-      other?.promotionPiece === this.promotionPiece
+      other?.promotionPiece === this.promotionPiece &&
+      other?.enPassant === this.enPassant &&
+      other?.castlingKingTargetIndex === this.castlingKingTargetIndex &&
+      other?.castlingRookStartIndex === this.castlingRookStartIndex &&
+      other?.castlingRookTargetIndex === this.castlingRookTargetIndex
     );
   }
 
