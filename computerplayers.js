@@ -238,6 +238,7 @@ class Evaluator {
       promotion: 0,
       killer: 0,
       history: 0,
+      standPat: 0,
       other: 0,
     };
   }
@@ -410,6 +411,7 @@ class Evaluator {
 
   searchAlphaBetaPruningAll(depth, alpha, beta, maximizingPlayer) {
     const startTime = performance.now();
+    const colorToMove = this.data.legalMoves.color;
     let result = undefined;
     let totalCount = 0;
     let totalCutOffs = 0;
@@ -420,7 +422,8 @@ class Evaluator {
         alpha,
         beta,
         maximizingPlayer,
-        0
+        0,
+        colorToMove
       );
       totalCount += result.count;
       totalCutOffs += result.cutOffs;
@@ -466,14 +469,21 @@ class Evaluator {
     };
   }
 
-  searchAlphaBetaPruningCapturesOnly(alpha, beta, maximizingPlayer, ply = 0) {
+  searchAlphaBetaPruningCapturesOnly(
+    alpha,
+    beta,
+    maximizingPlayer,
+    ply = 0,
+    colorToMove = this.data.legalMoves.color
+  ) {
     const result = this.searchAlphaBetaPruning(
       true,
       MAX_QUIESCENCE_DEPTH,
       alpha,
       beta,
       maximizingPlayer,
-      ply
+      ply,
+      colorToMove
     );
     //console.log("Search captures: best="+result.bestMove?.toAlgebraicNotation() +", count=" + result.count + ", cuts: " + result.cutOffs +", eval="+result.evaluation);
     return result;
@@ -484,49 +494,42 @@ class Evaluator {
     alpha,
     beta,
     maximizingPlayer,
-    ply = 0
+    ply = 0,
+    colorToMove = this.data.legalMoves.color
   ) {
     if (depth === 0) {
       if (!capturesOnly) {
-        const evalWithCapturesOnly = this.searchAlphaBetaPruningCapturesOnly(
+        return this.searchAlphaBetaPruningCapturesOnly(
           alpha,
           beta,
           maximizingPlayer,
-          ply
+          ply,
+          colorToMove
         );
-        if (evalWithCapturesOnly.bestMove) {
-          return evalWithCapturesOnly;
-        }
       }
-      const newHash = this.data.newHash(game.color);
-      const ttResult = this.tt.use(game.color, newHash, alpha, beta, depth);
-      let evaluation = 0;
-      let bestMove = undefined;
-      if (ttResult) {
-        evaluation = ttResult.evaluation;
-        bestMove = ttResult.bestMove;
-      } else {
-        evaluation = this.evaluate(maximizingPlayer);
-        this.tt.store(newHash, depth, evaluation, TranspositionFlag.EXACT);
-      }
+      const evaluation = this.evaluate(maximizingPlayer);
       return {
-        bestMove: bestMove,
+        bestMove: undefined,
         evaluation: evaluation,
         count: 1,
         cutOffs: 0,
       };
     }
-    const newHash = this.data.newHash(game.color);
-    const ttResult = this.tt.use(game.color, newHash, alpha, beta, depth);
-    if (ttResult) {
-      return {
-        bestMove: ttResult.bestMove,
-        evaluation: ttResult.evaluation,
-        count: 1,
-        cutOffs: 0,
-      };
+    const newHash = this.data.newHash(colorToMove);
+    if (!capturesOnly) {
+      const ttResult = this.tt.use(colorToMove, newHash, alpha, beta, depth);
+      if (ttResult) {
+        return {
+          bestMove: ttResult.bestMove,
+          evaluation: ttResult.evaluation,
+          count: 1,
+          cutOffs: 0,
+        };
+      }
     }
-    const ttBestMove = this.tt.bestMoveForOrdering(newHash);
+    const ttBestMove = capturesOnly
+      ? undefined
+      : this.tt.bestMoveForOrdering(newHash);
     let moves = [...this.data.legalMoves.moves];
     if (capturesOnly && !this.data.check) {
       const captureMoves = [];
@@ -538,10 +541,43 @@ class Evaluator {
     moves = this.orderMoves(moves, ttBestMove, ply);
     this.recordTTBestMoveStats(ttBestMove, moves);
     let minMaxEval = 0;
+    let totalCount = 0;
+    let totalCutOffs = 0;
+    const hasStandPat = capturesOnly && !this.data.check;
     if (maximizingPlayer) {
       minMaxEval = -Infinity;
+      if (hasStandPat) {
+        const standPat = this.evaluate(maximizingPlayer);
+        totalCount++;
+        if (standPat >= beta) {
+          this.recordStandPatCutoff(depth, capturesOnly);
+          return {
+            bestMove: undefined,
+            evaluation: standPat,
+            count: totalCount,
+            cutOffs: 1,
+          };
+        }
+        minMaxEval = standPat;
+        alpha = Math.max(alpha, standPat);
+      }
     } else {
       minMaxEval = Infinity;
+      if (hasStandPat) {
+        const standPat = this.evaluate(maximizingPlayer);
+        totalCount++;
+        if (standPat <= alpha) {
+          this.recordStandPatCutoff(depth, capturesOnly);
+          return {
+            bestMove: undefined,
+            evaluation: standPat,
+            count: totalCount,
+            cutOffs: 1,
+          };
+        }
+        minMaxEval = standPat;
+        beta = Math.min(beta, standPat);
+      }
     }
     if (moves.length === 0) {
       if (this.data.check) {
@@ -554,6 +590,14 @@ class Evaluator {
           cutOffs: 0,
         };
       }
+      if (hasStandPat) {
+        return {
+          bestMove: undefined,
+          evaluation: minMaxEval,
+          count: totalCount,
+          cutOffs: totalCutOffs,
+        };
+      }
       return {
         bestMove: undefined,
         evaluation: 0,
@@ -563,15 +607,12 @@ class Evaluator {
     }
 
     let currentBestMove = undefined;
-    let totalCount = 0;
-    let totalCutOffs = 0;
-    const origColor = game.color;
+    const origColor = colorToMove;
     for (let indexMove = 0; indexMove < moves.length; indexMove++) {
       const move = moves[indexMove];
       this.data.makeMove(move, false);
       const newColor = origColor ^ Piece.COLOR_MASK;
       this.data.setLegalMovesForSearch(newColor);
-      game.color = newColor;
 
       verbose === 1 &&
         depth > 1 &&
@@ -598,14 +639,13 @@ class Evaluator {
           alpha,
           beta,
           !maximizingPlayer,
-          ply + 1
+          ply + 1,
+          newColor
         );
       totalCutOffs += cutOffs;
 
       this.data.undoMove(move);
       this.data.setLegalMovesForSearch(origColor);
-      game.color = origColor;
-      redraw();
 
       // see https://www.appliedaicourse.com/blog/alpha-beta-pruning-in-artificial-intelligence/
       let transpositionFlag = TranspositionFlag.EXACT;
@@ -657,13 +697,15 @@ class Evaluator {
               minMaxEval +
               ")"
           );
-        this.tt.store(
-          newHash,
-          depth,
-          minMaxEval,
-          transpositionFlag,
-          currentBestMove
-        );
+        if (!capturesOnly) {
+          this.tt.store(
+            newHash,
+            depth,
+            minMaxEval,
+            transpositionFlag,
+            currentBestMove
+          );
+        }
         return {
           bestMove: currentBestMove,
           evaluation: minMaxEval,
@@ -687,13 +729,15 @@ class Evaluator {
           );
       }
     }
-    this.tt.store(
-      newHash,
-      depth,
-      minMaxEval,
-      TranspositionFlag.EXACT,
-      currentBestMove
-    );
+    if (!capturesOnly) {
+      this.tt.store(
+        newHash,
+        depth,
+        minMaxEval,
+        TranspositionFlag.EXACT,
+        currentBestMove
+      );
+    }
     return {
       bestMove: currentBestMove,
       evaluation: minMaxEval,
@@ -715,6 +759,17 @@ class Evaluator {
     if (source === "ttBestMove") {
       this.searchStats.ttBestMove.cutoff++;
     }
+  }
+
+  recordStandPatCutoff(depth, capturesOnly) {
+    this.searchStats.cutoffSources.standPat++;
+    if (!this.searchStats.cutoffSourcesByDepth[depth]) {
+      this.searchStats.cutoffSourcesByDepth[depth] =
+        this.createCutoffSourceStats();
+    }
+    this.searchStats.cutoffSourcesByDepth[depth].standPat++;
+    const mode = capturesOnly ? "quiescence" : "main";
+    this.searchStats.cutoffSourcesByMode[mode].standPat++;
   }
 
   recordTTBestMoveStats(ttBestMove, moves) {
@@ -777,6 +832,8 @@ class Evaluator {
       sources.killer +
       ", history=" +
       sources.history +
+      ", standPat=" +
+      sources.standPat +
       ", other=" +
       sources.other
     );
