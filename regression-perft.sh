@@ -210,6 +210,7 @@ for (const testCase of selectedCases) {
   }
 
   const expectedRootMoves = testCase.expectedRootMovesContain || [];
+  const excludedRootMoves = testCase.expectedRootMovesExclude || [];
   if (expectedRootMoves.length > 0) {
     const actualDepthOne = actualByDepth.get(1) || runPerft(1, testCase.fen);
     const missingRootMoves = expectedRootMoves.filter(
@@ -227,6 +228,27 @@ for (const testCase of selectedCases) {
           testCase.name +
           " root moves missing: " +
           missingRootMoves.join(", ")
+      );
+      console.log(i + " [" + testCase.fixtureIndex + "]: FEN: " + testCase.fen);
+    }
+  }
+  if (excludedRootMoves.length > 0) {
+    const actualDepthOne = actualByDepth.get(1) || runPerft(1, testCase.fen);
+    const presentRootMoves = excludedRootMoves.filter((move) =>
+      actualDepthOne.rootMoves.includes(move)
+    );
+    if (presentRootMoves.length === 0) {
+      results.push("excludedRootMoves=" + excludedRootMoves.join("|"));
+    } else {
+      failures++;
+      console.log(
+        i +
+          " [" +
+          testCase.fixtureIndex +
+          "]: FAIL " +
+          testCase.name +
+          " excluded root moves present: " +
+          presentRootMoves.join(", ")
       );
       console.log(i + " [" + testCase.fixtureIndex + "]: FEN: " + testCase.fen);
     }

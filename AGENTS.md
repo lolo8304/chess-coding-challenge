@@ -152,11 +152,6 @@ When working on AI:
 - Testing only happy-path moves and missing castling, en passant, promotion, check, and pinned-piece cases.
 - Assuming command-line Node execution is as complete as the browser path.
 
-## Run commands
-
-- whenever you make changes, accept that i also make changes myself and always use all changes in git. also for testing: don’t start any services. 
-- i have stated them in watch mode and you can use it via port 8080
-
 ## Run perfts
 
 - never go beyond 3, 3 is max due to performance issues on coding side
@@ -170,3 +165,12 @@ When working on AI:
 - before commit, make a branch in form "feature/<name>", commit the changes, push, and make a PR to main, and auto merge
 - after merge, checkout main and pull changes
 - always delete the feature branch after merge
+
+## Important Rules for the Agent
+
+- whenever you make changes, accept that i also make changes myself and always use all changes in git. also for testing: don’t start any services.
+- i have stated them in watch mode and you can use it via port 8080
+- Other important tip: don’t write too much as a final response. Keep it short
+- dont use p5.min.js for code analysis
+- if there is a bug question, after fixing the bug add this fen and the numbers as a regression test
+- 

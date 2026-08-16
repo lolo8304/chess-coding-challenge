@@ -163,7 +163,13 @@ class Move {
 
   toCoordinateNotation() {
     const sourceSquare = this.board.indexToAlgebraic(this.from);
-    const targetSquare = this.board.indexToAlgebraic(this.to);
+    const targetIndex =
+      this.castlingKingTargetIndex !== undefined &&
+      this.from === this.to &&
+      this.castlingRookStartIndex !== undefined
+        ? this.castlingRookStartIndex
+        : this.to;
+    const targetSquare = this.board.indexToAlgebraic(targetIndex);
     if (this.promotionPiece > 0) {
       const promotionPiece = this.promotionPiece & Piece.PIECES_MASK;
       return sourceSquare + targetSquare + PieceShortNamesLower[promotionPiece];
