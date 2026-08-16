@@ -181,7 +181,10 @@
         }
 
         .online-new-game-button.active {
-            display: inline-block;
+            align-items: center;
+            display: inline-flex;
+            justify-content: center;
+            padding: 0;
         }
 
         #aiStrength {
@@ -306,7 +309,10 @@
             }
 
             .control-row {
+                align-items: flex-start;
                 flex: 1 1 auto;
+                column-gap: 4px;
+                row-gap: 4px;
             }
 
             .primary-control-row,
@@ -314,10 +320,21 @@
                 flex-wrap: nowrap;
             }
 
+            .primary-control-row.play-controls,
             .mode-control-row {
-                flex-basis: 100%;
-                flex-wrap: wrap;
+                column-gap: 4px;
+                flex: 1 1 0;
+                min-width: 0;
                 order: 2;
+            }
+
+            .primary-control-row.play-controls,
+            .mode-control-row {
+                row-gap: 0;
+            }
+
+            .mode-control-row {
+                flex-wrap: wrap;
             }
 
             .primary-control-row.play-controls {
@@ -336,6 +353,20 @@
                 min-width: 0;
                 order: 2;
                 width: auto;
+            }
+
+            .primary-control-row.play-controls .play-player-names.active {
+                display: inline-flex;
+                flex: 1 1 auto;
+                max-width: none;
+                min-width: 0;
+            }
+
+            .primary-control-row.play-controls .online-new-game-button.active,
+            .primary-control-row.play-controls .online-games-select.active,
+            .mode-control-row .online-human-button,
+            .mode-control-row #aiStrength {
+                margin-top: 4px;
             }
 
             .primary-control-row.play-controls .online-new-game-button {
@@ -623,6 +654,16 @@
         <form onsubmit="handleSubmit(event)">
 	            <div class="console-header">
 	                <div class="control-row">
+	                    <button id="homeButton" class="icon-button" onclick="goHome(); return false" type="button"
+	                            aria-label="Home">
+	                        <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+	                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+	                             aria-hidden="true">
+	                            <path stroke-linecap="round" stroke-linejoin="round"
+	                                  d="m2.25 12 8.954-8.955a1.125 1.125 0 0 1 1.592 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
+	                        </svg>
+	                        <span class="visually-hidden">Home</span>
+	                    </button>
 	                    <div class="primary-control-row play-controls">
 		                    <button id="resignButton" class="icon-button" onclick="resignGame(); return false" type="button"
 		                            aria-label="Resign">
@@ -660,16 +701,6 @@
 		                    <span id="playPlayerNames" class="play-player-names"></span>
 	                    </div>
 	                    <div class="mode-control-row start-controls">
-	                        <button id="homeButton" class="icon-button" onclick="goHome(); return false" type="button"
-	                                aria-label="Home">
-	                            <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
-	                                 viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-	                                 aria-hidden="true">
-	                                <path stroke-linecap="round" stroke-linejoin="round"
-	                                      d="m2.25 12 8.954-8.955a1.125 1.125 0 0 1 1.592 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
-	                            </svg>
-	                            <span class="visually-hidden">Home</span>
-	                        </button>
 	                        <button class="computer-mode-button icon-button active" data-mode="white"
 	                                onclick="setComputerMode('white'); return false" type="button" aria-label="White">
 	                            <span class="king-icon white-king-icon" aria-hidden="true"></span>

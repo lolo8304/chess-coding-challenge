@@ -5,7 +5,7 @@ const Multiplayer = {
   currentGame: undefined,
   playerId: undefined,
   color: undefined,
-  events: undefined,
+  gameSocket: undefined,
   gamesListSocket: undefined,
   suppressNextLocalMove: false,
   connectedGamesStorageKey: "chessConnectedGames",
@@ -191,7 +191,7 @@ const Multiplayer = {
     await this.ensureRegistered();
     this.setStatus("Joining game...");
     try {
-      this.closeEvents();
+      this.closeGameUpdates();
       const result = await this.request(`/games/${gameId}/join`, {
         method: "POST",
         body: JSON.stringify({ playerName: this.userName }),
@@ -211,7 +211,7 @@ const Multiplayer = {
     setComputerMode("human-vs-human", true);
     this.applyPlayerTypesForConnection(color);
     this.applyGame(gameData);
-    this.connectEvents(gameData.id);
+    this.connectGameUpdates(gameData.id);
     if (this.shouldShowGamePicker()) {
       this.connectGamesList();
     } else {
@@ -222,7 +222,7 @@ const Multiplayer = {
   },
 
   leaveGame() {
-    this.closeEvents();
+    this.closeGameUpdates();
     this.closeGamesList();
     this.enabled = false;
     this.currentGame = undefined;
@@ -248,24 +248,41 @@ const Multiplayer = {
     }
   },
 
-  connectEvents(gameId) {
-    this.closeEvents();
-    const url = `${this.apiUrl}/games/${gameId}/events?apiKey=${encodeURIComponent(
-      this.apiKey
-    )}`;
-    this.events = new EventSource(url);
-    this.events.addEventListener("game", (event) => {
-      this.applyGame(JSON.parse(event.data));
-    });
-    this.events.onerror = () => {
+  connectGameUpdates(gameId) {
+    this.closeGameUpdates();
+    if (typeof WebSocket === "undefined") return;
+    const socket = new WebSocket(this.gameUpdatesUrl(gameId));
+    socket.onmessage = (event) => this.applyGameMessage(event.data, gameId);
+    socket.onclose = () => {
+      if (this.gameSocket === socket) {
+        this.gameSocket = undefined;
+      }
+    };
+    socket.onerror = () => {
       this.setStatus("Waiting for game server updates...");
     };
+    this.gameSocket = socket;
   },
 
-  closeEvents() {
-    if (this.events) {
-      this.events.close();
-      this.events = undefined;
+  closeGameUpdates() {
+    if (this.gameSocket) {
+      this.gameSocket.close();
+      this.gameSocket = undefined;
+    }
+  },
+
+  applyGameMessage(data, gameId) {
+    try {
+      const message = JSON.parse(data);
+      if (message.type !== "game" || !message.game) return;
+      if (this.currentGame?.id === gameId) {
+        this.applyGame(message.game);
+        if (message.game.status === "finished") {
+          this.closeGameUpdates();
+        }
+      }
+    } catch (error) {
+      this.setStatus(`Game update failed: ${error.message}`);
     }
   },
 
@@ -273,9 +290,7 @@ const Multiplayer = {
     if (!this.shouldShowGamePicker() || this.gamesListSocket) return;
     if (typeof WebSocket === "undefined") return;
     const socket = new WebSocket(this.gamesListUrl());
-    socket.onmessage = (event) => {
-      this.applyGamesListMessage(event.data);
-    };
+    socket.onmessage = (event) => this.applyGamesListMessage(event.data);
     socket.onclose = () => {
       if (this.gamesListSocket === socket) {
         this.gamesListSocket = undefined;
@@ -300,6 +315,22 @@ const Multiplayer = {
     url.pathname = "/games/ws";
     url.search = "";
     url.searchParams.set("apiKey", this.apiKey);
+    if (this.playerId) {
+      url.searchParams.set("playerId", this.playerId);
+    }
+    if (this.userName) {
+      url.searchParams.set("playerName", this.userName);
+    }
+    return url.toString();
+  },
+
+  gameUpdatesUrl(gameId) {
+    const url = new URL(this.apiUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.pathname = "/games/game/ws";
+    url.search = "";
+    url.searchParams.set("apiKey", this.apiKey);
+    url.searchParams.set("gameId", gameId);
     return url.toString();
   },
 
@@ -319,9 +350,8 @@ const Multiplayer = {
     try {
       const message = JSON.parse(data);
       if (message.type !== "games" || !Array.isArray(message.games)) return;
-      const games = await this.request(this.gamesPath()).catch(() => message.games);
       const rememberedGames = await this.loadRememberedUnfinishedGames();
-      const gameCount = this.renderGames(games, rememberedGames);
+      const gameCount = this.renderGames(message.games, rememberedGames);
       if (this.shouldShowGamePicker()) {
         this.setStatus(
           gameCount ? "Choose a waiting game." : "No games."
@@ -337,7 +367,7 @@ const Multiplayer = {
       (game) => game.id === gameId
     );
     try {
-      this.closeEvents();
+      this.closeGameUpdates();
       const gameData = await this.request(`/games/${gameId}`);
       if (gameData.status === "finished") {
         this.forgetConnection(gameId);
@@ -734,7 +764,11 @@ const Multiplayer = {
 function defaultChessApiUrl() {
   const hostname =
     typeof window === "undefined" ? undefined : window.location?.hostname;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
+  if (
+    window.location?.protocol === "file:" ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1"
+  ) {
     return "http://localhost:3000";
   }
   return "https://chess-game-server-red.vercel.app";
