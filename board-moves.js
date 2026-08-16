@@ -165,7 +165,8 @@ class Move {
     const sourceSquare = this.board.indexToAlgebraic(this.from);
     const targetSquare = this.board.indexToAlgebraic(this.to);
     if (this.promotionPiece > 0) {
-      return sourceSquare + targetSquare + toPieceNotation(this.promotionPiece);
+      const promotionPiece = this.promotionPiece & Piece.PIECES_MASK;
+      return sourceSquare + targetSquare + PieceShortNamesLower[promotionPiece];
     } else {
       return sourceSquare + targetSquare;
     }
@@ -830,7 +831,10 @@ class LegalMoves {
     const movesToKeep = [];
     if (movesToCheck.length === 1) {
       for (const move of this.moves) {
-        const canPreventCheck = checkAttackLookup[move.to] === true;
+        const canPreventCheck =
+          checkAttackLookup[move.to] === true ||
+          (move.enPassant !== undefined &&
+            checkAttackLookup[move.enPassant] === true);
         if (canPreventCheck && move.pieceOnly !== Piece.KING) {
           movesToKeep.push(move);
         }

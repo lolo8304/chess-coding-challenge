@@ -90,6 +90,85 @@
       ]
     },
     {
+      "name": "uci-lowercase-white-promotion",
+      "variant": "standard",
+      "source": "manual-regression",
+      "fen": "r2k4/p4P1p/2Qb4/8/8/6P1/8/3R3K w - - 3 2",
+      "expectedRootMovesContain": [
+        "f7f8q",
+        "f7f8r",
+        "f7f8n",
+        "f7f8b"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 39,
+          "captures": 3,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 4,
+          "checks": 10
+        },
+        {
+          "depth": 2,
+          "nodes": 296,
+          "captures": 11,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 0
+        },
+        {
+          "depth": 3,
+          "nodes": 11589,
+          "captures": 656,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 1104,
+          "checks": 2600
+        }
+      ]
+    },
+    {
+      "name": "en-passant-captures-checking-pawn",
+      "variant": "standard",
+      "source": "manual-regression",
+      "fen": "5k2/8/2Q2p2/p5pP/1p3K2/8/8/8 w - g6 0 1",
+      "expectedRootMovesContain": [
+        "h5g6"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 7,
+          "captures": 1,
+          "ep": 1,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 0
+        },
+        {
+          "depth": 2,
+          "nodes": 52,
+          "captures": 0,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 3
+        },
+        {
+          "depth": 3,
+          "nodes": 1432,
+          "captures": 63,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 324
+        }
+      ]
+    },
+    {
       "name": "standard-castling-start-required",
       "variant": "standard",
       "source": "manual-regression",
