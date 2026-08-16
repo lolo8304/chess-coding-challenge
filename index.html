@@ -324,7 +324,62 @@
 
             .mode-control-row {
                 flex-basis: 100%;
+                flex-wrap: wrap;
                 order: 2;
+            }
+
+            .primary-control-row.play-controls {
+                flex-wrap: wrap;
+            }
+
+            .primary-control-row.play-controls::after,
+            .mode-control-row::after {
+                content: "";
+                flex: 0 0 100%;
+                order: 1;
+            }
+
+            .primary-control-row.play-controls .online-new-game-button,
+            .primary-control-row.play-controls .online-games-select {
+                min-width: 0;
+                order: 2;
+                width: auto;
+            }
+
+            .primary-control-row.play-controls .online-new-game-button {
+                flex: 0 0 48px;
+                max-width: 48px;
+            }
+
+            .primary-control-row.play-controls .online-games-select {
+                flex: 1 1 auto;
+                max-width: 100%;
+            }
+
+            .mode-control-row .computer-mode-button[data-mode="ai-vs-ai"] {
+                order: 1;
+            }
+
+            .mode-control-row .computer-mode-button[data-mode="human-vs-human"] {
+                margin-left: 0;
+            }
+
+            .mode-control-row .online-human-button,
+            .mode-control-row #aiStrength {
+                flex: 0 1 calc(50% - 2px);
+                max-width: calc(50% - 2px);
+                min-width: 0;
+                order: 2;
+                width: auto;
+            }
+
+            .multiplayer-panel .control-row > span {
+                flex: 1 0 100%;
+            }
+
+            .multiplayer-panel .control-row button {
+                flex: 1 1 calc(33.333% - 6px);
+                min-width: 0;
             }
         }
     </style>
@@ -584,8 +639,14 @@
 		                        <span class="visually-hidden">Undo</span>
 		                    </button>
 		                    <button id="onlineNewGameButton" class="online-new-game-button"
-		                            onclick="createOnlineGame(); return false" type="button">
-		                        NEW GAME
+		                            onclick="createOnlineGame(); return false" type="button" aria-label="New game">
+		                        <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+		                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+		                             aria-hidden="true">
+		                            <path stroke-linecap="round" stroke-linejoin="round"
+		                                  d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+		                        </svg>
+		                        <span class="visually-hidden">New game</span>
 		                    </button>
 		                    <select id="onlineGamesSelect" class="online-games-select"
 		                            onchange="joinSelectedOnlineGame(this.value); this.value = ''; return false"
@@ -687,7 +748,16 @@
                 <div id="multiplayerPanel" class="multiplayer-panel">
                     <div class="control-row">
                         <span>User: <strong id="multiplayerUser"></strong></span>
-                        <button type="button" onclick="createOnlineGame(); return false">NEW GAME</button>
+                        <button class="multiplayer-new-game-button" type="button"
+                                onclick="createOnlineGame(); return false" aria-label="New game">
+                            <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                 viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                 aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                            </svg>
+                            <span class="visually-hidden">New game</span>
+                        </button>
                         <button type="button" onclick="refreshOnlineGames(); return false">Refresh games</button>
                         <button type="button" onclick="leaveOnlineGame(); return false">Leave</button>
                     </div>
