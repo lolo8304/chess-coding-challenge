@@ -130,11 +130,11 @@
             padding: 0;
         }
 
-        #calculationDepth {
+        #aiStrength {
             box-sizing: border-box;
             height: 48px;
             padding: 4px;
-            width: 64px;
+            width: 116px;
         }
 
         .king-icon {
@@ -372,8 +372,8 @@
             game?.syncClockToPhase?.();
         }
 
-        function updateCalculationDepth(depth) {
-            setCalculationDepth(depth);
+        function updateAiStrength(name) {
+            setAiSearchStrengthPreset(name);
         }
 
         function updateDebug(checked) {
@@ -382,9 +382,9 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             setupFen();
-            const calculationDepthElement = document.getElementById('calculationDepth');
-            if (calculationDepthElement) {
-                calculationDepthElement.value = getCalculationDepth();
+            const aiStrengthElement = document.getElementById('aiStrength');
+            if (aiStrengthElement) {
+                aiStrengthElement.value = getAiSearchStrengthPreset();
             }
             const debugElement = document.getElementById('debug');
             if (debugElement) {
@@ -520,14 +520,12 @@
 		                            </svg>
 	                            <span class="visually-hidden">AI vs. AI</span>
 	                        </button>
-	                        <select id="calculationDepth" onchange="updateCalculationDepth(this.value)">
-	                            <option value="1">400</option>
-	                            <option value="2">700</option>
-	                            <option value="3">900</option>
-	                            <option value="4" selected>1200</option>
-	                            <option value="5">1500</option>
-	                            <option value="6">1800</option>
-	                            <option value="7">2000</option>
+	                        <select id="aiStrength" onchange="updateAiStrength(this.value)" aria-label="AI strength">
+	                            <option value="beginner">Beginner</option>
+	                            <option value="casual">Casual</option>
+	                            <option value="club" selected>Club</option>
+	                            <option value="strong">Strong</option>
+	                            <option value="analysis">Analysis</option>
 	                        </select>
 	                    </div>
 	                </div>

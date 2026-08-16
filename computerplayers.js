@@ -113,7 +113,8 @@ class ComputerPlayerAlphaBetaPruning extends ComputerPlayer {
         getCalculationDepth(),
         -Infinity,
         Infinity,
-        true
+        true,
+        getAiSearchTimeLimitMilliseconds()
       );
     verbose === 1 &&
       console.log("Count Evaluations: " + evalutator.countEvaluated);
@@ -133,6 +134,32 @@ computerName = "alpha-beta";
 
 const CHECKMATE_EVALUATION = 1000000;
 const MAX_QUIESCENCE_DEPTH = 2;
+
+class SearchDeadline {
+  constructor(timeLimitMilliseconds) {
+    this.startMilliseconds = performance.now();
+    this.timeLimitMilliseconds = timeLimitMilliseconds;
+    this.timedOut = false;
+  }
+
+  elapsedMilliseconds() {
+    return performance.now() - this.startMilliseconds;
+  }
+
+  isExpired() {
+    if (this.timedOut) return true;
+    if (
+      this.timeLimitMilliseconds === undefined ||
+      this.timeLimitMilliseconds === null ||
+      !Number.isFinite(this.timeLimitMilliseconds) ||
+      this.timeLimitMilliseconds < 0
+    ) {
+      return false;
+    }
+    this.timedOut = this.elapsedMilliseconds() >= this.timeLimitMilliseconds;
+    return this.timedOut;
+  }
+}
 
 class EvaluatorData {
   constructor() {
@@ -409,51 +436,73 @@ class Evaluator {
     return 0;
   }
 
-  searchAlphaBetaPruningAll(depth, alpha, beta, maximizingPlayer) {
-    const startTime = performance.now();
+  searchAlphaBetaPruningAll(
+    depth,
+    alpha,
+    beta,
+    maximizingPlayer,
+    timeLimitMilliseconds
+  ) {
+    const deadline = new SearchDeadline(timeLimitMilliseconds);
     const colorToMove = this.data.legalMoves.color;
     let result = undefined;
     let totalCount = 0;
     let totalCutOffs = 0;
+    let completedDepth = 0;
     for (let currentDepth = 1; currentDepth <= depth; currentDepth++) {
-      result = this.searchAlphaBetaPruning(
+      if (deadline.isExpired()) {
+        break;
+      }
+      const depthResult = this.searchAlphaBetaPruning(
         false,
         currentDepth,
         alpha,
         beta,
         maximizingPlayer,
         0,
-        colorToMove
+        colorToMove,
+        deadline
       );
-      totalCount += result.count;
-      totalCutOffs += result.cutOffs;
+      if (depthResult.timedOut) {
+        break;
+      }
+      result = depthResult;
+      completedDepth = currentDepth;
+      totalCount += depthResult.count;
+      totalCutOffs += depthResult.cutOffs;
       verbose === 1 &&
         console.log(
           "Iterative depth " +
             currentDepth +
             ": best=" +
-            result.bestMove?.toAlgebraicNotation() +
+            depthResult.bestMove?.toAlgebraicNotation() +
             ", eval=" +
-            result.evaluation +
+            depthResult.evaluation +
             ", count=" +
-            result.count +
+            depthResult.count +
             ", cuts=" +
-            result.cutOffs
+            depthResult.cutOffs
         );
     }
-    const diffTime = Math.round(performance.now() - startTime);
+    const diffTime = Math.round(deadline.elapsedMilliseconds());
     if (verbose > 0) {
       console.log(
         "Search all: best=" +
-          result.bestMove?.toAlgebraicNotation() +
+          result?.bestMove?.toAlgebraicNotation() +
           ", name=" +
-          result.bestMove?.pieceName +
+          result?.bestMove?.pieceName +
           ", count=" +
           totalCount +
           ", cuts: " +
           totalCutOffs +
           ", eval=" +
-          result.evaluation +
+          result?.evaluation +
+          ", depth=" +
+          completedDepth +
+          "/" +
+          depth +
+          ", timedOut=" +
+          deadline.timedOut +
           ", time=" +
           diffTime +
           " [ms]"
@@ -462,10 +511,12 @@ class Evaluator {
       this.tt.printStats();
     }
     return {
-      bestMove: result.bestMove,
-      evaluation: result.evaluation,
+      bestMove: result?.bestMove,
+      evaluation: result?.evaluation,
       count: totalCount,
       cutOffs: totalCutOffs,
+      completedDepth,
+      timedOut: deadline.timedOut,
     };
   }
 
@@ -474,7 +525,8 @@ class Evaluator {
     beta,
     maximizingPlayer,
     ply = 0,
-    colorToMove = this.data.legalMoves.color
+    colorToMove = this.data.legalMoves.color,
+    deadline = undefined
   ) {
     const result = this.searchAlphaBetaPruning(
       true,
@@ -483,7 +535,8 @@ class Evaluator {
       beta,
       maximizingPlayer,
       ply,
-      colorToMove
+      colorToMove,
+      deadline
     );
     //console.log("Search captures: best="+result.bestMove?.toAlgebraicNotation() +", count=" + result.count + ", cuts: " + result.cutOffs +", eval="+result.evaluation);
     return result;
@@ -495,8 +548,18 @@ class Evaluator {
     beta,
     maximizingPlayer,
     ply = 0,
-    colorToMove = this.data.legalMoves.color
+    colorToMove = this.data.legalMoves.color,
+    deadline = undefined
   ) {
+    if (deadline?.isExpired()) {
+      return {
+        bestMove: undefined,
+        evaluation: undefined,
+        count: 0,
+        cutOffs: 0,
+        timedOut: true,
+      };
+    }
     if (depth === 0) {
       if (!capturesOnly) {
         return this.searchAlphaBetaPruningCapturesOnly(
@@ -504,7 +567,8 @@ class Evaluator {
           beta,
           maximizingPlayer,
           ply,
-          colorToMove
+          colorToMove,
+          deadline
         );
       }
       const evaluation = this.evaluate(maximizingPlayer);
@@ -513,6 +577,7 @@ class Evaluator {
         evaluation: evaluation,
         count: 1,
         cutOffs: 0,
+        timedOut: false,
       };
     }
     const newHash = this.data.newHash(colorToMove);
@@ -524,6 +589,7 @@ class Evaluator {
           evaluation: ttResult.evaluation,
           count: 1,
           cutOffs: 0,
+          timedOut: false,
         };
       }
     }
@@ -556,6 +622,7 @@ class Evaluator {
             evaluation: standPat,
             count: totalCount,
             cutOffs: 1,
+            timedOut: false,
           };
         }
         minMaxEval = standPat;
@@ -573,6 +640,7 @@ class Evaluator {
             evaluation: standPat,
             count: totalCount,
             cutOffs: 1,
+            timedOut: false,
           };
         }
         minMaxEval = standPat;
@@ -588,6 +656,7 @@ class Evaluator {
             : CHECKMATE_EVALUATION + depth,
           count: 1,
           cutOffs: 0,
+          timedOut: false,
         };
       }
       if (hasStandPat) {
@@ -596,6 +665,7 @@ class Evaluator {
           evaluation: minMaxEval,
           count: totalCount,
           cutOffs: totalCutOffs,
+          timedOut: false,
         };
       }
       return {
@@ -603,12 +673,22 @@ class Evaluator {
         evaluation: 0,
         count: 1,
         cutOffs: 0,
+        timedOut: false,
       };
     }
 
     let currentBestMove = undefined;
     const origColor = colorToMove;
     for (let indexMove = 0; indexMove < moves.length; indexMove++) {
+      if (deadline?.isExpired()) {
+        return {
+          bestMove: currentBestMove,
+          evaluation: minMaxEval,
+          count: totalCount,
+          cutOffs: totalCutOffs,
+          timedOut: true,
+        };
+      }
       const move = moves[indexMove];
       this.data.makeMove(move, false);
       const newColor = origColor ^ Piece.COLOR_MASK;
@@ -640,12 +720,24 @@ class Evaluator {
           beta,
           !maximizingPlayer,
           ply + 1,
-          newColor
+          newColor,
+          deadline
         );
       totalCutOffs += cutOffs;
 
       this.data.undoMove(move);
       this.data.setLegalMovesForSearch(origColor);
+
+      if (deadline?.timedOut) {
+        totalCount += count;
+        return {
+          bestMove: currentBestMove,
+          evaluation: minMaxEval,
+          count: totalCount,
+          cutOffs: totalCutOffs,
+          timedOut: true,
+        };
+      }
 
       // see https://www.appliedaicourse.com/blog/alpha-beta-pruning-in-artificial-intelligence/
       let transpositionFlag = TranspositionFlag.EXACT;
@@ -711,6 +803,7 @@ class Evaluator {
           evaluation: minMaxEval,
           count: totalCount,
           cutOffs: totalCutOffs,
+          timedOut: false,
         };
       } else {
         verbose === 1 &&
@@ -743,6 +836,7 @@ class Evaluator {
       evaluation: minMaxEval,
       count: totalCount,
       cutOffs: totalCutOffs,
+      timedOut: false,
     };
   }
 

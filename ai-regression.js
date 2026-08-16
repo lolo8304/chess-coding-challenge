@@ -99,6 +99,20 @@ const TESTS = [
     expectedCutOffs: 1,
     initialGameColor: "black",
   },
+  {
+    name: "immediate timeout preserves search state",
+    fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    depth: 7,
+    timeoutOnly: true,
+    timeLimitMilliseconds: 0,
+    expectedMove: undefined,
+    expectedLegalMoves: 20,
+    expectedCount: 0,
+    expectedCutOffs: 0,
+    expectedCompletedDepth: 0,
+    expectedTimedOut: true,
+    initialGameColor: "black",
+  },
 ];
 
 function createEngineContext() {
@@ -182,6 +196,19 @@ function runSearchTest(test) {
             0,
             turn
           );
+        } else if (aiSearchTest.timeoutOnly) {
+          const evaluator = new Evaluator(
+            TranspositionTableInstance(),
+            data,
+            turn
+          );
+          result = evaluator.searchAlphaBetaPruningAll(
+            aiSearchTest.depth,
+            -Infinity,
+            Infinity,
+            true,
+            aiSearchTest.timeLimitMilliseconds
+          );
         } else {
           const player = evaluators.newPlayerOn("alpha-beta", data, turn);
           const move = player.chooseMove();
@@ -201,6 +228,10 @@ function runSearchTest(test) {
           actualCount: result.count,
           expectedCutOffs: aiSearchTest.expectedCutOffs,
           actualCutOffs: result.cutOffs,
+          expectedCompletedDepth: aiSearchTest.expectedCompletedDepth,
+          actualCompletedDepth: result.completedDepth,
+          expectedTimedOut: aiSearchTest.expectedTimedOut,
+          actualTimedOut: result.timedOut,
           legalMovesBefore,
           turn,
           legalMovesColorAfter: data.legalMoves.color,
@@ -258,6 +289,22 @@ function checkResult(result) {
       "cutoff count",
       result.actualCutOffs,
       result.expectedCutOffs
+    );
+  }
+  if (result.expectedCompletedDepth !== undefined) {
+    assertEqual(
+      failures,
+      "completed depth",
+      result.actualCompletedDepth,
+      result.expectedCompletedDepth
+    );
+  }
+  if (result.expectedTimedOut !== undefined) {
+    assertEqual(
+      failures,
+      "timed out",
+      result.actualTimedOut,
+      result.expectedTimedOut
     );
   }
   return failures;
