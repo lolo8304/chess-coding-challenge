@@ -526,6 +526,22 @@ assert(
   "Expected paused online games to display the paused state"
 );
 
+context.__Multiplayer.gamePollingTimer = { close() {} };
+context.__Multiplayer.renderCurrentGame();
+assert(
+  elementForId("playPlayerNames").children[0].className ===
+    "connection-status-dot disconnected polling-leading" &&
+    elementForId("playPlayerNames").children[1].className ===
+      "connection-status-dot disconnected",
+  "Expected paused polling online games to show two red connection dots"
+);
+assert(
+  elementForId("playPlayerNames").children[2].textContent ===
+    "OwnGame1 (white) - paused",
+  "Expected paused polling online games to display player names after both dots"
+);
+context.__Multiplayer.gamePollingTimer = undefined;
+
 let appliedOnlineStatus;
 let appliedPhase;
 context.game = {
