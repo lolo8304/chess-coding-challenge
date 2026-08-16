@@ -1088,7 +1088,9 @@ const Multiplayer = {
   },
 
   connectionStatus() {
-    if (this.currentGame?.status !== "active") return "disconnected";
+    if (this.currentGame?.status !== "active") {
+      return this.gamePollingTimer ? "polling-disconnected" : "disconnected";
+    }
     if (this.gameSocket) return "connected";
     if (this.gamePollingTimer) return "polling";
     return "disconnected";
@@ -1100,17 +1102,23 @@ const Multiplayer = {
 
   renderConnectionLabel(element, label, connectionStatus) {
     this.clearConnectionLabel(element);
+    const isPolling = connectionStatus.startsWith("polling");
+    const dotStatus =
+      connectionStatus === "polling-disconnected"
+        ? "disconnected"
+        : connectionStatus === "polling"
+        ? "connected"
+        : connectionStatus;
     const dot = document.createElement("span");
-    dot.className =
-      connectionStatus === "polling"
-        ? "connection-status-dot connected polling-leading"
-        : `connection-status-dot ${connectionStatus}`;
+    dot.className = `connection-status-dot ${dotStatus}${
+      isPolling ? " polling-leading" : ""
+    }`;
     const text = document.createElement("span");
     text.textContent = label;
     element.appendChild(dot);
-    if (connectionStatus === "polling") {
+    if (isPolling) {
       const pollingDot = document.createElement("span");
-      pollingDot.className = "connection-status-dot connected";
+      pollingDot.className = `connection-status-dot ${dotStatus}`;
       element.appendChild(pollingDot);
     }
     element.appendChild(text);
