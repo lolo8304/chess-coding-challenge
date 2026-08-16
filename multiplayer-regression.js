@@ -496,6 +496,23 @@ assert(
   "Expected player names to be displayed once the game starts"
 );
 
+context.__Multiplayer.gameSocket = undefined;
+context.__Multiplayer.gamePollingTimer = { close() {} };
+context.__Multiplayer.renderCurrentGame();
+assert(
+  elementForId("playPlayerNames").children[0].className ===
+    "connection-status-dot connected polling-leading" &&
+    elementForId("playPlayerNames").children[1].className ===
+      "connection-status-dot connected",
+  "Expected polling online games to show two green connection dots"
+);
+assert(
+  elementForId("playPlayerNames").children[2].textContent ===
+    "OwnGame1 (white)",
+  "Expected polling online games to display player names after both dots"
+);
+context.__Multiplayer.gamePollingTimer = undefined;
+
 context.__Multiplayer.currentGame.status = "paused";
 context.__Multiplayer.renderCurrentGame();
 assert(
