@@ -1,5 +1,5 @@
 const Multiplayer = {
-  apiUrl: "http://localhost:3000",
+  apiUrl: defaultChessApiUrl(),
   apiKey: "vpFJPgzELLUXHhgJ2234cTBtoPvamwU4",
   userName: undefined,
   currentGame: undefined,
@@ -683,6 +683,15 @@ const Multiplayer = {
     }
   },
 };
+
+function defaultChessApiUrl() {
+  const hostname =
+    typeof window === "undefined" ? undefined : window.location?.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://localhost:3000";
+  }
+  return "https://chess-game-server-red.vercel.app";
+}
 
 function setupMultiplayer() {
   Multiplayer.init();
