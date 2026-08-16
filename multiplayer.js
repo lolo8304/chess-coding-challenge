@@ -1101,10 +1101,18 @@ const Multiplayer = {
   renderConnectionLabel(element, label, connectionStatus) {
     this.clearConnectionLabel(element);
     const dot = document.createElement("span");
-    dot.className = `connection-status-dot ${connectionStatus}`;
+    dot.className =
+      connectionStatus === "polling"
+        ? "connection-status-dot connected polling-leading"
+        : `connection-status-dot ${connectionStatus}`;
     const text = document.createElement("span");
     text.textContent = label;
     element.appendChild(dot);
+    if (connectionStatus === "polling") {
+      const pollingDot = document.createElement("span");
+      pollingDot.className = "connection-status-dot connected";
+      element.appendChild(pollingDot);
+    }
     element.appendChild(text);
   },
 
