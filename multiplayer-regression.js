@@ -897,6 +897,11 @@ context.__Multiplayer.request = async () => ({
     elementForId("onlineGamesSelect").classNames.has("active"),
     "Expected game dropdown to show after entering online mode"
   );
+  assert(
+    context.__Multiplayer.gamesListPollingTimer,
+    "Expected online mode to use game-list polling when WebSocket is unavailable"
+  );
+  context.__Multiplayer.closeGamesList();
 
   let openedGamesListUrl;
   let gamesListSocket;
@@ -960,8 +965,14 @@ context.__Multiplayer.request = async () => ({
 
   const originalSocketTimeout = context.__Multiplayer.socketKeepAliveTimeoutMs;
   const originalSocketCheck = context.__Multiplayer.socketKeepAliveCheckMs;
+  const originalSocketDelay = context.__Multiplayer.socketReconnectDelayMs;
+  const originalSocketMaxReconnects =
+    context.__Multiplayer.socketMaxReconnectAttempts;
+  const originalPollingInterval = context.__Multiplayer.pollingIntervalMs;
   context.__Multiplayer.socketKeepAliveTimeoutMs = 5;
   context.__Multiplayer.socketKeepAliveCheckMs = 1;
+  context.__Multiplayer.socketReconnectDelayMs = 1;
+  context.__Multiplayer.socketMaxReconnectAttempts = 20;
   const staleGameSockets = [];
   context.WebSocket = function WebSocket(url) {
     this.url = url;
@@ -1010,8 +1021,88 @@ context.__Multiplayer.request = async () => ({
     "Expected stale games list WebSocket to be closed"
   );
   context.__Multiplayer.closeGamesList();
+
+  context.__Multiplayer.socketMaxReconnectAttempts = 1;
+  context.__Multiplayer.pollingIntervalMs = 5;
+
+  let gamePollRequested = false;
+  const closedBeforeOpenGameSockets = [];
+  context.WebSocket = function WebSocket(url) {
+    this.url = url;
+    this.close = () => {
+      this.closed = true;
+    };
+    closedBeforeOpenGameSockets.push(this);
+    const socket = this;
+    setTimeout(() => socket.onclose && socket.onclose(), 0);
+  };
+  context.__Multiplayer.currentGame = {
+    id: "fallback-game",
+    status: "active",
+    turn: "white",
+    fen: "fallback-before",
+    players: {
+      white: { name: "LocalWhite" },
+      black: { name: "RemoteBlack" },
+    },
+    moves: [],
+  };
+  context.__Multiplayer.request = async (path) => {
+    if (path === "/games/fallback-game") {
+      gamePollRequested = true;
+      return {
+        ...context.__Multiplayer.currentGame,
+        fen: "fallback-before",
+      };
+    }
+    throw new Error(`unexpected request ${path}`);
+  };
+  context.__Multiplayer.connectGameUpdates("fallback-game");
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert(
+    closedBeforeOpenGameSockets.length >= 2,
+    "Expected game updates to try WebSocket before polling fallback"
+  );
+  assert(
+    gamePollRequested && context.__Multiplayer.gamePollingTimer,
+    "Expected game updates to fall back to polling after failed WebSockets"
+  );
+  context.__Multiplayer.closeGameUpdates();
+
+  const closedBeforeOpenListSockets = [];
+  context.WebSocket = function WebSocket(url) {
+    this.url = url;
+    this.close = () => {
+      this.closed = true;
+    };
+    closedBeforeOpenListSockets.push(this);
+    const socket = this;
+    setTimeout(() => socket.onclose && socket.onclose(), 0);
+  };
+  context.__Multiplayer.enabled = true;
+  context.__Multiplayer.currentGame = undefined;
+  context.__Multiplayer.playerId = undefined;
+  context.__Multiplayer.color = undefined;
+  context.__Multiplayer.request = async (path) => {
+    return [];
+  };
+  context.__Multiplayer.connectGamesList();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert(
+    closedBeforeOpenListSockets.length >= 2,
+    "Expected game list to try WebSocket before polling fallback"
+  );
+  assert(
+    context.__Multiplayer.gamesListPollingTimer,
+    "Expected game list to fall back to polling after failed WebSockets"
+  );
+  context.__Multiplayer.closeGamesList();
+
   context.__Multiplayer.socketKeepAliveTimeoutMs = originalSocketTimeout;
   context.__Multiplayer.socketKeepAliveCheckMs = originalSocketCheck;
+  context.__Multiplayer.socketReconnectDelayMs = originalSocketDelay;
+  context.__Multiplayer.socketMaxReconnectAttempts = originalSocketMaxReconnects;
+  context.__Multiplayer.pollingIntervalMs = originalPollingInterval;
 
   let explicitCreateRequest;
   context.game = {

@@ -15,11 +15,22 @@ const Multiplayer = {
   enabled: false,
   socketKeepAliveTimeoutMs: 3000,
   socketKeepAliveCheckMs: 1000,
+  socketMaxReconnectAttempts: 3,
+  socketReconnectDelayMs: 250,
+  pollingIntervalMs: 1000,
   connectionMaxAgeMs: 24 * 60 * 60 * 1000,
   gameSocketLastMessageAt: 0,
   gameSocketKeepAliveTimer: undefined,
+  gameSocketReconnectAttempts: 0,
+  gameSocketReconnectToken: 0,
+  gamePollingTimer: undefined,
+  gamePollingInFlight: false,
   gamesListSocketLastMessageAt: 0,
   gamesListSocketKeepAliveTimer: undefined,
+  gamesListSocketReconnectAttempts: 0,
+  gamesListSocketReconnectToken: 0,
+  gamesListPollingTimer: undefined,
+  gamesListPollingInFlight: false,
 
   init() {
     this.userName =
@@ -351,7 +362,17 @@ const Multiplayer = {
 
   connectGameUpdates(gameId) {
     this.closeGameUpdates();
-    if (typeof WebSocket === "undefined") return;
+    this.gameSocketReconnectAttempts = 0;
+    this.gameSocketReconnectToken += 1;
+    this.tryConnectGameSocket(gameId);
+  },
+
+  tryConnectGameSocket(gameId) {
+    this.clearGamePolling();
+    if (typeof WebSocket === "undefined") {
+      this.startGamePolling(gameId);
+      return;
+    }
     const socket = new WebSocket(this.gameUpdatesUrl(gameId));
     this.watchGameSocket(socket, gameId);
     socket.onmessage = (event) => this.applyGameMessage(event.data, gameId);
@@ -363,7 +384,7 @@ const Multiplayer = {
           this.currentGame?.id === gameId &&
           this.currentGame.status !== "finished"
         ) {
-          setTimeout(() => this.connectGameUpdates(gameId), 250);
+          this.handleGameSocketFailure(gameId);
         }
       }
     };
@@ -375,9 +396,81 @@ const Multiplayer = {
 
   closeGameUpdates() {
     this.clearGameSocketWatch();
+    this.clearGamePolling();
+    this.gameSocketReconnectAttempts = 0;
+    this.gameSocketReconnectToken += 1;
     if (this.gameSocket) {
-      this.gameSocket.close();
+      const socket = this.gameSocket;
       this.gameSocket = undefined;
+      socket.close();
+    }
+  },
+
+  handleGameSocketFailure(gameId) {
+    this.gameSocketReconnectAttempts += 1;
+    if (this.gameSocketReconnectAttempts <= this.socketMaxReconnectAttempts) {
+      const reconnectToken = this.gameSocketReconnectToken;
+      setTimeout(
+        () => {
+          if (this.gameSocketReconnectToken === reconnectToken) {
+            this.tryConnectGameSocket(gameId);
+          }
+        },
+        this.socketReconnectDelayMs
+      );
+      return;
+    }
+    this.startGamePolling(gameId);
+  },
+
+  startGamePolling(gameId) {
+    this.clearGameSocketWatch();
+    if (this.gameSocket) {
+      const socket = this.gameSocket;
+      this.gameSocket = undefined;
+      socket.close();
+    }
+    if (this.gamePollingTimer) return;
+    this.setStatus("Using polling for game updates.");
+    this.gamePollingInFlight = false;
+    this.pollGameUpdate(gameId);
+    this.gamePollingTimer = setInterval(
+      () => this.pollGameUpdate(gameId),
+      this.pollingIntervalMs
+    );
+    if (this.gamePollingTimer.unref) {
+      this.gamePollingTimer.unref();
+    }
+  },
+
+  clearGamePolling() {
+    if (!this.gamePollingTimer) return;
+    clearInterval(this.gamePollingTimer);
+    this.gamePollingTimer = undefined;
+    this.gamePollingInFlight = false;
+  },
+
+  async pollGameUpdate(gameId) {
+    if (
+      this.gamePollingInFlight ||
+      this.currentGame?.id !== gameId ||
+      this.currentGame.status === "finished"
+    ) {
+      return;
+    }
+    this.gamePollingInFlight = true;
+    try {
+      const gameData = await this.request(`/games/${gameId}`);
+      if (this.currentGame?.id === gameId) {
+        this.applyGame(gameData);
+        if (gameData.status === "finished") {
+          this.closeGameUpdates();
+        }
+      }
+    } catch (error) {
+      this.setStatus(`Game polling failed: ${error.message}`);
+    } finally {
+      this.gamePollingInFlight = false;
     }
   },
 
@@ -385,6 +478,7 @@ const Multiplayer = {
     try {
       const message = JSON.parse(data);
       this.gameSocketLastMessageAt = Date.now();
+      this.gameSocketReconnectAttempts = 0;
       if (message.type === "keep-alive") return;
       if (message.type !== "game" || !message.game) return;
       if (this.currentGame?.id === gameId) {
@@ -399,8 +493,26 @@ const Multiplayer = {
   },
 
   connectGamesList() {
-    if (!this.shouldShowGamePicker() || this.gamesListSocket) return;
-    if (typeof WebSocket === "undefined") return;
+    if (
+      !this.shouldShowGamePicker() ||
+      this.gamesListSocket ||
+      this.gamesListPollingTimer
+    ) {
+      return;
+    }
+    this.clearGamesListPolling();
+    this.gamesListSocketReconnectAttempts = 0;
+    this.gamesListSocketReconnectToken += 1;
+    this.tryConnectGamesListSocket();
+  },
+
+  tryConnectGamesListSocket() {
+    if (!this.shouldShowGamePicker()) return;
+    this.clearGamesListPolling();
+    if (typeof WebSocket === "undefined") {
+      this.startGamesListPolling();
+      return;
+    }
     const socket = new WebSocket(this.gamesListUrl());
     this.watchGamesListSocket(socket);
     socket.onmessage = (event) => this.applyGamesListMessage(event.data);
@@ -409,7 +521,7 @@ const Multiplayer = {
         this.clearGamesListSocketWatch();
         this.gamesListSocket = undefined;
         if (this.shouldShowGamePicker()) {
-          setTimeout(() => this.connectGamesList(), 250);
+          this.handleGamesListSocketFailure();
         }
       }
     };
@@ -421,9 +533,78 @@ const Multiplayer = {
 
   closeGamesList() {
     this.clearGamesListSocketWatch();
+    this.clearGamesListPolling();
+    this.gamesListSocketReconnectAttempts = 0;
+    this.gamesListSocketReconnectToken += 1;
     if (this.gamesListSocket) {
-      this.gamesListSocket.close();
+      const socket = this.gamesListSocket;
       this.gamesListSocket = undefined;
+      socket.close();
+    }
+  },
+
+  handleGamesListSocketFailure() {
+    this.gamesListSocketReconnectAttempts += 1;
+    if (
+      this.gamesListSocketReconnectAttempts <= this.socketMaxReconnectAttempts
+    ) {
+      const reconnectToken = this.gamesListSocketReconnectToken;
+      setTimeout(
+        () => {
+          if (this.gamesListSocketReconnectToken === reconnectToken) {
+            this.tryConnectGamesListSocket();
+          }
+        },
+        this.socketReconnectDelayMs
+      );
+      return;
+    }
+    this.startGamesListPolling();
+  },
+
+  startGamesListPolling() {
+    this.clearGamesListSocketWatch();
+    if (this.gamesListSocket) {
+      const socket = this.gamesListSocket;
+      this.gamesListSocket = undefined;
+      socket.close();
+    }
+    if (this.gamesListPollingTimer || !this.shouldShowGamePicker()) return;
+    this.setStatus("Using polling for game list.");
+    this.gamesListPollingInFlight = false;
+    this.pollGamesList();
+    this.gamesListPollingTimer = setInterval(
+      () => this.pollGamesList(),
+      this.pollingIntervalMs
+    );
+    if (this.gamesListPollingTimer.unref) {
+      this.gamesListPollingTimer.unref();
+    }
+  },
+
+  clearGamesListPolling() {
+    if (!this.gamesListPollingTimer) return;
+    clearInterval(this.gamesListPollingTimer);
+    this.gamesListPollingTimer = undefined;
+    this.gamesListPollingInFlight = false;
+  },
+
+  async pollGamesList() {
+    if (this.gamesListPollingInFlight || !this.shouldShowGamePicker()) {
+      return;
+    }
+    this.gamesListPollingInFlight = true;
+    try {
+      const games = await this.request(this.gamesPath());
+      const rememberedGames = await this.loadRememberedUnfinishedGames();
+      const gameCount = this.renderGames(games, rememberedGames);
+      if (this.shouldShowGamePicker()) {
+        this.setStatus(gameCount ? "Choose a waiting game." : "No games.");
+      }
+    } catch (error) {
+      this.setStatus(`Game list polling failed: ${error.message}`);
+    } finally {
+      this.gamesListPollingInFlight = false;
     }
   },
 
@@ -468,6 +649,7 @@ const Multiplayer = {
     try {
       const message = JSON.parse(data);
       this.gamesListSocketLastMessageAt = Date.now();
+      this.gamesListSocketReconnectAttempts = 0;
       if (message.type === "keep-alive") return;
       if (message.type !== "games" || !Array.isArray(message.games)) return;
       const rememberedGames = await this.loadRememberedUnfinishedGames();
@@ -504,7 +686,7 @@ const Multiplayer = {
         this.currentGame?.id === gameId &&
         this.currentGame.status !== "finished"
       ) {
-        this.connectGameUpdates(gameId);
+        this.handleGameSocketFailure(gameId);
       }
     }, this.socketKeepAliveCheckMs);
     if (this.gameSocketKeepAliveTimer.unref) {
@@ -537,7 +719,7 @@ const Multiplayer = {
       this.gamesListSocket = undefined;
       socket.close();
       if (this.shouldShowGamePicker()) {
-        this.connectGamesList();
+        this.handleGamesListSocketFailure();
       }
     }, this.socketKeepAliveCheckMs);
     if (this.gamesListSocketKeepAliveTimer.unref) {
@@ -808,7 +990,7 @@ const Multiplayer = {
       this.renderConnectionLabel(
         playNamesElement,
         label,
-        this.isConnectionLive()
+        this.connectionStatus()
       );
       playNamesElement.title = label;
       playNamesElement.classList.add("active");
@@ -905,20 +1087,21 @@ const Multiplayer = {
     return dropdownEntries.length;
   },
 
-  isConnectionLive() {
-    return Boolean(this.currentGame?.status === "active" && this.gameSocket);
+  connectionStatus() {
+    if (this.currentGame?.status !== "active") return "disconnected";
+    if (this.gameSocket) return "connected";
+    if (this.gamePollingTimer) return "polling";
+    return "disconnected";
   },
 
   clearConnectionLabel(element) {
     element.innerHTML = "";
   },
 
-  renderConnectionLabel(element, label, isConnected) {
+  renderConnectionLabel(element, label, connectionStatus) {
     this.clearConnectionLabel(element);
     const dot = document.createElement("span");
-    dot.className = `connection-status-dot ${
-      isConnected ? "connected" : "disconnected"
-    }`;
+    dot.className = `connection-status-dot ${connectionStatus}`;
     const text = document.createElement("span");
     text.textContent = label;
     element.appendChild(dot);
