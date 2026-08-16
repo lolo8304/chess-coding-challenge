@@ -19,18 +19,25 @@ class ComputerPlayerFactory {
   }
 }
 
+const PlayerType = Object.freeze({
+  HUMAN: "HUMAN",
+  AI: "AI",
+  CONNECTED_PLAYER: "CONNECTED_PLAYER",
+  CONNECTED_HUMAN: "CONNECTED_PLAYER",
+});
+
 class ComputerPlayer {
   constructor(name, boardData, color) {
     this.name = name;
     this.boardData = boardData;
     this.color = color;
-    this._isOn = false;
+    this.playerType = PlayerType.HUMAN;
     this.runNext = false;
     this.tt = TranspositionTableInstance();
   }
 
   isTurn(color) {
-    if (!this._isOn) return false;
+    if (!this.isAI()) return false;
     const turn = this.color === color;
     this.runNext = turn;
     if (this.runNext) {
@@ -62,15 +69,38 @@ class ComputerPlayer {
   }
 
   on() {
-    this._isOn = true;
+    this.setPlayerType(PlayerType.AI);
     return this;
   }
   off() {
-    this._isOn = false;
+    this.setPlayerType(PlayerType.HUMAN);
     return this;
   }
+  connectedHuman() {
+    this.setPlayerType(PlayerType.CONNECTED_PLAYER);
+    return this;
+  }
+  setPlayerType(playerType) {
+    this.playerType = playerType;
+    if (playerType !== PlayerType.AI) {
+      this.runNext = false;
+    }
+    return this;
+  }
+  isAI() {
+    return this.playerType === PlayerType.AI;
+  }
+  isHuman() {
+    return this.playerType === PlayerType.HUMAN;
+  }
+  isConnectedHuman() {
+    return this.isConnectedPlayer();
+  }
+  isConnectedPlayer() {
+    return this.playerType === PlayerType.CONNECTED_PLAYER;
+  }
   isOn() {
-    return this._isOn;
+    return this.isAI();
   }
 }
 

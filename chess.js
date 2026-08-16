@@ -90,6 +90,26 @@ function resizeFinalize() {
   );
 }
 
+function loadFenIntoGame(fen) {
+  fen_hash = fen || FEN_start;
+  window.location.hash = fen_hash;
+  resizeFinalize();
+  if (typeof Multiplayer !== "undefined" && Multiplayer.isOnlineGame()) {
+    Multiplayer.applyPlayerTypesForConnection(Multiplayer.color);
+  }
+  setupFen();
+  if (typeof setGamePhase === "function") {
+    const phase =
+      typeof Multiplayer !== "undefined" && Multiplayer.isWaitingForOpponent()
+        ? "waiting"
+        : "play";
+    setGamePhase(phase);
+  }
+  if (typeof setActiveComputerMode === "function") {
+    setActiveComputerMode("human-vs-human");
+  }
+}
+
 function reset() {
   useStartScreen = false;
   isGameFinished = false;
@@ -161,6 +181,9 @@ function uuidv4() {
 }
 
 function setup() {
+  if (typeof ensureChessUserName === "function") {
+    ensureChessUserName();
+  }
   const piecesInImage = [
     Piece.KING,
     Piece.QUEEN,

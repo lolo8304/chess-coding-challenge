@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "./ai-regression.sh && ./regression-perft.sh 2 \"\" 20",
+    "test": "node multiplayer-regression.js && ./ai-regression.sh && ./regression-perft.sh 2 \"\" 20",
     "test-full": "./ai-regression.sh && ./regression-perft.sh 2"
   },
   "engines": {
