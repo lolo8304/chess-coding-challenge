@@ -95,12 +95,15 @@ function loadFenIntoGame(fen) {
   window.location.hash = fen_hash;
   resizeFinalize();
   if (typeof Multiplayer !== "undefined" && Multiplayer.isOnlineGame()) {
+    game.setOnlineStatus?.(Multiplayer.currentGame?.status);
     Multiplayer.applyPlayerTypesForConnection(Multiplayer.color);
   }
   setupFen();
   if (typeof setGamePhase === "function") {
     const phase =
-      typeof Multiplayer !== "undefined" && Multiplayer.isWaitingForOpponent()
+      typeof Multiplayer !== "undefined" && Multiplayer.isPaused()
+        ? "paused"
+        : typeof Multiplayer !== "undefined" && Multiplayer.isWaitingForOpponent()
         ? "waiting"
         : "play";
     setGamePhase(phase);

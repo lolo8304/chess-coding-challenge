@@ -303,6 +303,7 @@
 
         .console.phase-start .play-controls,
         .console.phase-end .play-controls,
+        .console.phase-paused .start-controls,
         .console.phase-waiting .start-controls,
         .console.phase-play .start-controls {
             display: none;
@@ -596,6 +597,9 @@
         }
 
         function effectiveGamePhase() {
+            if (typeof Multiplayer !== "undefined" && Multiplayer.isPaused()) {
+                return "paused";
+            }
             if (typeof Multiplayer !== "undefined" && Multiplayer.isWaitingForOpponent()) {
                 return "waiting";
             }
@@ -612,15 +616,16 @@
             consoleElement.classList.toggle('phase-start', phase === "start");
             consoleElement.classList.toggle('phase-play', phase === "play");
             consoleElement.classList.toggle('phase-waiting', phase === "waiting");
+            consoleElement.classList.toggle('phase-paused', phase === "paused");
             consoleElement.classList.toggle('phase-end', phase === "end");
 
             const undoButton = document.getElementById('undoButton');
             if (undoButton) {
-                undoButton.disabled = phase === "waiting" || !hasUndoMove();
+                undoButton.disabled = phase === "waiting" || phase === "paused" || !hasUndoMove();
             }
             const resignButton = document.getElementById('resignButton');
             if (resignButton) {
-                resignButton.disabled = phase === "waiting";
+                resignButton.disabled = phase === "waiting" || phase === "paused";
             }
         }
 

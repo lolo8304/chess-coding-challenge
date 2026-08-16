@@ -50,6 +50,7 @@ class Game {
     };
     this.clockRunningColor = undefined;
     this.clockTurnStartMilliseconds = this.nowMilliseconds();
+    this.onlineStatus = undefined;
   }
 
   draw() {
@@ -67,6 +68,9 @@ class Game {
     if (this.board.check) {
       turnText += " CHECK";
     }
+    if (this.isPaused()) {
+      turnText = "GAME PAUSED";
+    }
     if (this.board.data.isFinished()) {
       turnText = this.board.data.result;
       if (this.color === Piece.WHITE && this.remainingMilliseconds(Piece.WHITE) === 0) {
@@ -79,7 +83,7 @@ class Game {
     const phase = this.effectivePhase();
     let bannerBackgroundColor = this.color === Piece.WHITE ? "white" : "black";
     let bannerTextColor = this.color === Piece.WHITE ? "black" : "white";
-    if (phase === "waiting") {
+    if (phase === "waiting" || phase === "paused") {
       bannerBackgroundColor = "black";
       bannerTextColor = "white";
     }
@@ -140,6 +144,15 @@ class Game {
 
   isEndPhase() {
     return this.effectivePhase() === "end";
+  }
+
+  isPaused() {
+    return this.onlineStatus === "paused" || this.effectivePhase() === "paused";
+  }
+
+  setOnlineStatus(status) {
+    this.onlineStatus = status;
+    this.syncClockToPhase();
   }
 
   effectivePhase() {
