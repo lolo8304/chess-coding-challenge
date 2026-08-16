@@ -509,8 +509,50 @@ assert(
   "Expected paused online games to display the paused state"
 );
 
+let appliedOnlineStatus;
+let appliedPhase;
+context.game = {
+  setOnlineStatus(status) {
+    appliedOnlineStatus = status;
+  },
+};
+context.setGamePhase = (phase) => {
+  appliedPhase = phase;
+};
+context.__Multiplayer.currentGame = {
+  id: "game-paused",
+  status: "active",
+  fen: "same-fen",
+  players: {
+    white: { name: "OwnGame1" },
+    black: { name: "OtherGame2" },
+  },
+  moves: [],
+};
+context.__Multiplayer.applyGame({
+  id: "game-paused",
+  status: "paused",
+  fen: "same-fen",
+  players: {
+    white: { name: "OwnGame1" },
+    black: { name: "OtherGame2" },
+  },
+  moves: [],
+});
+assert(appliedOnlineStatus === "paused", "Expected paused status on the game");
+assert(appliedPhase === "paused", "Expected paused games to set paused phase");
+assert(context.__Multiplayer.isPaused(), "Expected multiplayer to report paused");
+
 let pauseRequest;
-context.__Multiplayer.currentGame.status = "active";
+context.__Multiplayer.currentGame = {
+  id: "game-1",
+  status: "active",
+  turn: "white",
+  players: {
+    white: { name: "OwnGame1" },
+    black: { name: "OtherGame2" },
+  },
+};
 context.__Multiplayer.playerId = "player-1";
 context.__Multiplayer.request = (path, options = {}) => {
   pauseRequest = { path, body: JSON.parse(options.body) };
@@ -1125,6 +1167,31 @@ context.__Multiplayer.request = async () => ({
       __Multiplayer.playerId = "black-player";
       __Multiplayer.color = "black";
       __Multiplayer.applyPlayerTypesForConnection("black");
+
+      __Multiplayer.applyGame({
+        id: "real-game",
+        status: "paused",
+        turn: "white",
+        fen: FEN_start,
+        players: {
+          white: { name: "WhitePlayer" },
+          black: { name: "BlackPlayer" },
+        },
+        moves: [],
+      });
+      if (!game.isPaused()) throw new Error("Expected the real game to know it is paused");
+      __Multiplayer.applyGame({
+        id: "real-game",
+        status: "active",
+        turn: "white",
+        fen: FEN_start,
+        players: {
+          white: { name: "WhitePlayer" },
+          black: { name: "BlackPlayer" },
+        },
+        moves: [],
+      });
+      if (game.isPaused()) throw new Error("Expected the real game to resume from paused");
 
       const realWhiteMove = game.board.data.legalMoves.moves.find(
         (move) => move.toCoordinateNotation() === "e2e4"

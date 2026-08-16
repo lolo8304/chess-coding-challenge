@@ -53,6 +53,10 @@ const Multiplayer = {
     return this.isOnlineGame() && this.currentGame?.status === "waiting";
   },
 
+  isPaused() {
+    return this.isOnlineGame() && this.currentGame?.status === "paused";
+  },
+
   shouldShowGamePicker() {
     return (
       this.isOnlineMode() &&
@@ -658,6 +662,9 @@ const Multiplayer = {
     const oldGame = this.currentGame;
     const oldFen = oldGame?.fen;
     this.currentGame = gameData;
+    if (typeof game !== "undefined" && game?.setOnlineStatus) {
+      game.setOnlineStatus(gameData.status);
+    }
     this.finishReported = gameData.status === "finished";
     if (typeof setGamePhase === "function") {
       setGamePhase(this.phaseForGame(gameData));
@@ -727,6 +734,7 @@ const Multiplayer = {
 
   phaseForGame(gameData) {
     if (gameData.status === "active") return "play";
+    if (gameData.status === "paused") return "paused";
     if (gameData.status === "finished") return "end";
     return "waiting";
   },
