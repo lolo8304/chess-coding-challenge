@@ -62,6 +62,10 @@ function runPerft(depth, fen) {
   if (!summary) {
     throw new Error("Could not parse perft summary for depth " + depth);
   }
+  const rootMoves = Array.from(
+    output.matchAll(/^([a-h][1-8][a-h][1-8][qrbn]?): Nodes=/gm),
+    (match) => match[1]
+  );
   return {
     nodes: Number(summary[1]),
     hits: Number(summary[2]),
@@ -69,6 +73,7 @@ function runPerft(depth, fen) {
     castles: Number(summary[4]),
     prom: Number(summary[5]),
     checks: Number(summary[6]),
+    rootMoves,
   };
 }
 
@@ -172,9 +177,11 @@ for (const testCase of selectedCases) {
   if (depths.length === 0) continue;
 
   const results = [];
+  const actualByDepth = new Map();
   for (const expected of depths) {
     depthTargets++;
     const actual = runPerft(expected.depth, testCase.fen);
+    actualByDepth.set(expected.depth, actual);
     const mismatches = expectedEntries(expected).filter(
       ([key, value]) => actual[key] !== value
     );
@@ -200,6 +207,29 @@ for (const testCase of selectedCases) {
         detail
     );
     console.log(i + " [" + testCase.fixtureIndex + "]: FEN: " + testCase.fen);
+  }
+
+  const expectedRootMoves = testCase.expectedRootMovesContain || [];
+  if (expectedRootMoves.length > 0) {
+    const actualDepthOne = actualByDepth.get(1) || runPerft(1, testCase.fen);
+    const missingRootMoves = expectedRootMoves.filter(
+      (move) => !actualDepthOne.rootMoves.includes(move)
+    );
+    if (missingRootMoves.length === 0) {
+      results.push("rootMoves=" + expectedRootMoves.join("|"));
+    } else {
+      failures++;
+      console.log(
+        i +
+          " [" +
+          testCase.fixtureIndex +
+          "]: FAIL " +
+          testCase.name +
+          " root moves missing: " +
+          missingRootMoves.join(", ")
+      );
+      console.log(i + " [" + testCase.fixtureIndex + "]: FEN: " + testCase.fen);
+    }
   }
 
   const caseElapsedMs =
