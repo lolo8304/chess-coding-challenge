@@ -38,6 +38,8 @@ class Game {
       this.board.data,
       Piece.WHITE
     );
+    this.setPlayerType(Piece.WHITE, PlayerType.HUMAN);
+    this.setPlayerType(Piece.BLACK, PlayerType.AI);
 
     this.velocity = 0.02;
     this.time = 0.0;
@@ -59,13 +61,9 @@ class Game {
     let turnText =
       this.color === Piece.WHITE
         ? "WHITE's turn" +
-          (this.computerWhite.isOn()
-            ? "(AI)" // (" + this.computerWhite.name + ")"
-            : "")
+          this.playerTypeLabel(this.computerWhite)
         : "BLACK's turn" +
-          (this.computerBlack.isOn()
-            ? " (AI)" // (" + this.computerBlack.name + ")"
-            : "");
+          this.playerTypeLabel(this.computerBlack);
     if (this.board.check) {
       turnText += " CHECK";
     }
@@ -109,8 +107,8 @@ class Game {
         if (
           !movedWhite &&
           !movedBlack &&
-          this.computerBlack.isOn() &&
-          this.computerWhite.isOn()
+          this.computerBlack.isAI() &&
+          this.computerWhite.isAI()
         ) {
           this.computerWhite.isTurn(this.color);
         }
@@ -191,7 +189,7 @@ class Game {
 
   undoLastMove() {
     let lastMove = this.board.undoLastMove();
-    if (lastMove && this.nextComputer().isOn()) {
+    if (lastMove && this.nextComputer().isAI()) {
       lastMove = this.board.undoLastMove();
       if (lastMove) {
         // change already to change back to the same again if opponent is auto
@@ -222,15 +220,31 @@ class Game {
       this.computerMove(undefined, 2);
       this.time = 1.01;
     }
+    return fen;
   }
 
   makeMove(move, depth, runComputerNow = true) {
     if (typeof setGamePhase === "function") {
       setGamePhase("play");
     }
+    const movePayload = {
+      from: move.from,
+      to: move.to,
+      promotion: move.promotionPiece || Piece.None,
+      notation: move.toCoordinateNotation(),
+    };
     this.stopActiveClock();
     this.board.makeMove(move, true);
-    this.makeTurnAndCalculate(depth, runComputerNow);
+    const fen = this.makeTurnAndCalculate(depth, runComputerNow);
+    if (
+      typeof Multiplayer !== "undefined" &&
+      !Multiplayer.suppressNextLocalMove
+    ) {
+      Multiplayer.publishMove(movePayload, fen);
+      if (this.board.data.isFinished()) {
+        Multiplayer.reportLocalFinishedGame(this.board.data.result);
+      }
+    }
     if (typeof updateConsolePhase === "function") {
       updateConsolePhase();
     }
@@ -247,6 +261,12 @@ class Game {
   }
 
   clicked(clientY, clientX) {
+    if (
+      typeof Multiplayer !== "undefined" &&
+      !Multiplayer.canMove(this.color)
+    ) {
+      return false;
+    }
     const startTime = performance.now();
     const selectedIndex = this.board.data.selectedIndex;
     if (selectedIndex >= 0) {
@@ -295,20 +315,35 @@ class Game {
   nextComputer() {
     return this.color === Piece.WHITE ? this.computerBlack : this.computerWhite;
   }
+  playerForColor(color) {
+    return color === Piece.WHITE ? this.computerWhite : this.computerBlack;
+  }
+  setPlayerType(color, playerType) {
+    this.playerForColor(color).setPlayerType(playerType);
+  }
+  setPlayerTypes(whiteType, blackType) {
+    this.setPlayerType(Piece.WHITE, whiteType);
+    this.setPlayerType(Piece.BLACK, blackType);
+  }
+  playerTypeLabel(player) {
+    if (player.isAI()) return " (AI)";
+    if (player.isConnectedPlayer()) return " (Remote)";
+    return "";
+  }
 
   computerMoveBlack() {
-    if (this.computerBlack.isOn() && this.computerBlack.isTurn(this.color)) {
+    if (this.computerBlack.isAI() && this.computerBlack.isTurn(this.color)) {
       // skip
     }
   }
   computerMoveWhite() {
-    if (this.computerWhite.isOn() && this.computerWhite.isTurn(this.color)) {
+    if (this.computerWhite.isAI() && this.computerWhite.isTurn(this.color)) {
       //skip
     }
   }
 
   computerMoveNow(computer, depth) {
-    if (computer.isOn() && computer.shallRunNext()) {
+    if (computer.isAI() && computer.shallRunNext()) {
       const computerMove = computer.chooseMove();
       if (computerMove) {
         this.makeMove(computerMove, depth);

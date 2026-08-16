@@ -121,6 +121,10 @@
             margin-left: 12px;
         }
 
+        .computer-mode-button[data-mode="human-vs-human"] {
+            margin-left: 12px;
+        }
+
         .icon-button {
             align-items: center;
             display: inline-flex;
@@ -128,6 +132,64 @@
             justify-content: center;
             width: 48px;
             padding: 0;
+        }
+
+        .online-human-button {
+            gap: 6px;
+            max-width: 180px;
+            min-width: 96px;
+            padding: 0 8px;
+            width: auto;
+        }
+
+        .online-human-name {
+            display: inline-block;
+            font-size: 13px;
+            line-height: 1;
+            max-width: 112px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .play-player-names {
+            align-items: center;
+            color: white;
+            display: none;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.2;
+            max-width: min(44vw, 320px);
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .play-player-names.active {
+            display: inline-flex;
+        }
+
+        .online-games-select {
+            display: none;
+            height: 48px;
+            max-width: min(42vw, 260px);
+            min-width: 150px;
+        }
+
+        .online-games-select.active {
+            display: inline-block;
+        }
+
+        .online-new-game-button {
+            display: none;
+            font-weight: 700;
+            height: 48px;
+            white-space: nowrap;
+        }
+
+        .online-new-game-button.active {
+            display: inline-block;
         }
 
         #aiStrength {
@@ -209,6 +271,7 @@
 
         .console.phase-start .play-controls,
         .console.phase-end .play-controls,
+        .console.phase-waiting .start-controls,
         .console.phase-play .start-controls {
             display: none;
         }
@@ -227,6 +290,22 @@
             flex: 1 1 auto;
             margin-bottom: 0;
             min-width: 0;
+        }
+
+        .multiplayer-panel {
+            border-top: 1px solid #444;
+            display: none;
+            margin-top: 10px;
+            padding-top: 10px;
+        }
+
+        .multiplayer-panel.active {
+            display: block;
+        }
+
+        .multiplayer-panel ul {
+            margin: 8px 0 0;
+            padding-left: 20px;
         }
 
         @media (max-width: 640px) {
@@ -266,6 +345,8 @@
     <script src="history.js"></script>
     <script src="board.js"></script>
     <script src="computerplayers.js"></script>
+    <script src="names.js"></script>
+    <script src="multiplayer.js"></script>
     <script>
         let gamePhase = "start";
 
@@ -278,16 +359,16 @@
             }
         }
 
-        function updateStatus(computer, status) {
+        function updatePlayerType(player, playerType) {
             const resultElement = document.getElementById('result');
-            if (computer === 'white') {
-                status === "ON" ? game.computerWhite.on().checkForAutoTurn() : game.computerWhite.off()
-            } else if (computer === 'black') {
-                status === "ON" ? game.computerBlack.on().checkForAutoTurn() : game.computerBlack.off()
+            if (player === 'white') {
+                game.computerWhite.setPlayerType(playerType).checkForAutoTurn()
+            } else if (player === 'black') {
+                game.computerBlack.setPlayerType(playerType).checkForAutoTurn()
             }
         }
 
-        function setComputerMode(mode) {
+        function setComputerMode(mode, keepOnlineGame) {
             if (effectiveGamePhase() === "end") {
                 startNewGame();
             }
@@ -298,27 +379,37 @@
             }
 
             if (selectedMode === 'white') {
-                updateStatus('white', 'OFF');
-                updateStatus('black', 'ON');
+                updatePlayerType('white', PlayerType.HUMAN);
+                updatePlayerType('black', PlayerType.AI);
             } else if (selectedMode === 'black') {
-                updateStatus('black', 'OFF');
-                updateStatus('white', 'ON');
+                updatePlayerType('black', PlayerType.HUMAN);
+                updatePlayerType('white', PlayerType.AI);
             } else if (selectedMode === 'human') {
-                updateStatus('white', 'OFF');
-                updateStatus('black', 'OFF');
+                updatePlayerType('white', PlayerType.HUMAN);
+                updatePlayerType('black', PlayerType.HUMAN);
             } else if (selectedMode === 'ai-vs-ai') {
-                updateStatus('white', 'ON');
-                updateStatus('black', 'ON');
+                updatePlayerType('white', PlayerType.AI);
+                updatePlayerType('black', PlayerType.AI);
+            } else if (selectedMode === 'human-vs-human') {
+                updatePlayerType('white', PlayerType.HUMAN);
+                updatePlayerType('black', PlayerType.CONNECTED_PLAYER);
             }
 
+            if (selectedMode !== 'human-vs-human' && !keepOnlineGame && typeof Multiplayer !== "undefined") {
+                Multiplayer.leaveGame();
+            }
             setActiveComputerMode(selectedMode);
-            setGamePhase("play");
+            setGamePhase(selectedMode === 'human-vs-human' ? "waiting" : "play");
         }
 
         function setActiveComputerMode(mode) {
             document.querySelectorAll('.computer-mode-button').forEach(function (button) {
                 button.classList.toggle('active', button.dataset.mode === mode);
             });
+            const panel = document.getElementById('multiplayerPanel');
+            if (panel) {
+                panel.classList.toggle('active', mode === 'human-vs-human');
+            }
         }
 
         function startNewGame() {
@@ -328,13 +419,20 @@
             setupFen();
             setActiveComputerMode("white");
             setGamePhase("start");
+            if (typeof Multiplayer !== "undefined") {
+                Multiplayer.leaveGame();
+            }
         }
 
-        function resignGame() {
+        async function resignGame() {
             if (!game?.board?.data || game.board.data.isFinished()) {
                 return;
             }
             if (!window.confirm("Are you sure you want to resign?")) {
+                return;
+            }
+            if (typeof Multiplayer !== "undefined" && Multiplayer.isOnlineGame()) {
+                await Multiplayer.resign("resignation");
                 return;
             }
             game.board.data.result = PieceNames[game.color] + " resigned";
@@ -346,6 +444,9 @@
         }
 
         function effectiveGamePhase() {
+            if (typeof Multiplayer !== "undefined" && Multiplayer.isWaitingForOpponent()) {
+                return "waiting";
+            }
             return game?.board?.data?.isFinished?.() ? "end" : gamePhase;
         }
 
@@ -358,11 +459,16 @@
             const phase = effectiveGamePhase();
             consoleElement.classList.toggle('phase-start', phase === "start");
             consoleElement.classList.toggle('phase-play', phase === "play");
+            consoleElement.classList.toggle('phase-waiting', phase === "waiting");
             consoleElement.classList.toggle('phase-end', phase === "end");
 
             const undoButton = document.getElementById('undoButton');
             if (undoButton) {
-                undoButton.disabled = !hasUndoMove();
+                undoButton.disabled = phase === "waiting" || !hasUndoMove();
+            }
+            const resignButton = document.getElementById('resignButton');
+            if (resignButton) {
+                resignButton.disabled = phase === "waiting";
             }
         }
 
@@ -389,6 +495,9 @@
             const debugElement = document.getElementById('debug');
             if (debugElement) {
                 debugElement.checked = verbose > 0;
+            }
+            if (typeof setupMultiplayer === "function") {
+                setupMultiplayer();
             }
             updateConsolePhase();
         });
@@ -456,7 +565,7 @@
 	            <div class="console-header">
 	                <div class="control-row">
 	                    <div class="primary-control-row play-controls">
-		                    <button class="icon-button" onclick="resignGame(); return false" type="button"
+		                    <button id="resignButton" class="icon-button" onclick="resignGame(); return false" type="button"
 		                            aria-label="Resign">
 		                        <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
 		                             stroke-width="1.5" stroke="currentColor" aria-hidden="true">
@@ -474,6 +583,16 @@
 		                        </svg>
 		                        <span class="visually-hidden">Undo</span>
 		                    </button>
+		                    <button id="onlineNewGameButton" class="online-new-game-button"
+		                            onclick="createOnlineGame(); return false" type="button">
+		                        NEW GAME
+		                    </button>
+		                    <select id="onlineGamesSelect" class="online-games-select"
+		                            onchange="joinSelectedOnlineGame(this.value); this.value = ''; return false"
+		                            aria-label="Join online game">
+		                        <option value="">Games</option>
+		                    </select>
+		                    <span id="playPlayerNames" class="play-player-names"></span>
 	                    </div>
 	                    <div class="mode-control-row start-controls">
 	                        <button class="computer-mode-button icon-button active" data-mode="white"
@@ -500,15 +619,27 @@
 		                        </button>
 		                        <button class="computer-mode-button icon-button" data-mode="human"
 		                                onclick="setComputerMode('human'); return false" type="button"
-		                                aria-label="Human vs. human">
+		                                aria-label="Local human vs. human">
 		                            <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
 		                                 viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
 		                                 aria-hidden="true">
 		                                <path stroke-linecap="round" stroke-linejoin="round"
 		                                      d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0"/>
 		                            </svg>
-		                            <span class="visually-hidden">Human vs. human</span>
+		                            <span class="visually-hidden">Local human vs. human</span>
 		                        </button>
+	                        <button class="computer-mode-button icon-button online-human-button" data-mode="human-vs-human"
+	                                onclick="startOnlineHumanVsHuman(); return false"
+	                                type="button" aria-label="Online human vs. human">
+	                            <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+	                                 viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+	                                 aria-hidden="true">
+	                                <path stroke-linecap="round" stroke-linejoin="round"
+	                                      d="M7.5 8.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm9 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.75 21a5.25 5.25 0 0 1 7.5-4.742M12.75 21a5.25 5.25 0 0 1 7.5-4.742M9.75 12h4.5"/>
+	                            </svg>
+	                            <span id="multiplayerModeName" class="online-human-name" aria-hidden="true"></span>
+	                            <span class="visually-hidden">Online human vs. human</span>
+	                        </button>
 		                        <button class="computer-mode-button icon-button" data-mode="ai-vs-ai"
 		                                onclick="setComputerMode('ai-vs-ai'); return false" type="button"
 		                                aria-label="AI vs. AI">
@@ -552,6 +683,17 @@
                 <div class="fen-row">
                     <button type="submit">FEN</button>
                     <input id="fen" class="full-width-input" value=""/>
+                </div>
+                <div id="multiplayerPanel" class="multiplayer-panel">
+                    <div class="control-row">
+                        <span>User: <strong id="multiplayerUser"></strong></span>
+                        <button type="button" onclick="createOnlineGame(); return false">NEW GAME</button>
+                        <button type="button" onclick="refreshOnlineGames(); return false">Refresh games</button>
+                        <button type="button" onclick="leaveOnlineGame(); return false">Leave</button>
+                    </div>
+                    <div id="multiplayerCurrent">No online game.</div>
+                    <div id="multiplayerStatus">Not connected.</div>
+                    <ul id="multiplayerGames"></ul>
                 </div>
             </div>
         </form>
