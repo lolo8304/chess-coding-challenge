@@ -182,6 +182,7 @@ const context = vm.createContext({
     this.close = () => {};
   },
   window: {
+    location: { hostname: "chess-coding-challenge.vercel.app" },
     localStorage: {
       getItem: (key) => storage.get(key),
       setItem: (key, value) => storage.set(key, value),
@@ -227,6 +228,17 @@ assert(
 
 loadScript("multiplayer.js", context);
 vm.runInContext("globalThis.__Multiplayer = Multiplayer;", context);
+
+assert(
+  context.__Multiplayer.apiUrl === "https://chess-game-server-red.vercel.app",
+  "Expected production browsers to use the hosted game server API"
+);
+context.window.location.hostname = "localhost";
+assert(
+  context.defaultChessApiUrl() === "http://localhost:3000",
+  "Expected localhost browsers to use the local game server API"
+);
+context.__Multiplayer.apiUrl = context.defaultChessApiUrl();
 
 context.__Multiplayer.currentGame = {
   id: "game-1",
