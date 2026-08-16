@@ -161,6 +161,8 @@ When working on AI:
 
 - never go beyond 3, 3 is max due to performance issues on coding side
 - for regressions tests within after an agent change - run the first 1-20 in pert only
+- run local perft using "./perft.sh 2 '<fen string>'
+- run stockfish perft using "./stockfish.sh 2 '<fen string>'"
 
 ## Commit, Push, merge rules
 

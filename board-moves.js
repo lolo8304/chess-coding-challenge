@@ -828,10 +828,12 @@ class LegalMoves {
       move.addIndexesToLookup(checkAttackLookup, this.checkAttackIndexes);
     }
     const movesToKeep = [];
-    for (const move of this.moves) {
-      const canPreventCheck = checkAttackLookup[move.to] === true;
-      if (canPreventCheck && move.pieceOnly !== Piece.KING) {
-        movesToKeep.push(move);
+    if (movesToCheck.length === 1) {
+      for (const move of this.moves) {
+        const canPreventCheck = checkAttackLookup[move.to] === true;
+        if (canPreventCheck && move.pieceOnly !== Piece.KING) {
+          movesToKeep.push(move);
+        }
       }
     }
     verbose >= 2 && console.table(movesToKeep);
