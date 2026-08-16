@@ -84,7 +84,7 @@ const Multiplayer = {
       this.connectGamesList();
     }
     try {
-      const games = await this.request("/games");
+      const games = await this.request(this.gamesPath());
       const rememberedGames = await this.loadRememberedUnfinishedGames();
       const gameCount = this.renderGames(games, rememberedGames);
       this.setStatus(
@@ -303,12 +303,25 @@ const Multiplayer = {
     return url.toString();
   },
 
+  gamesPath() {
+    const params = new URLSearchParams();
+    if (this.playerId) {
+      params.set("playerId", this.playerId);
+    }
+    if (this.userName) {
+      params.set("playerName", this.userName);
+    }
+    const query = params.toString();
+    return query ? `/games?${query}` : "/games";
+  },
+
   async applyGamesListMessage(data) {
     try {
       const message = JSON.parse(data);
       if (message.type !== "games" || !Array.isArray(message.games)) return;
+      const games = await this.request(this.gamesPath()).catch(() => message.games);
       const rememberedGames = await this.loadRememberedUnfinishedGames();
-      const gameCount = this.renderGames(message.games, rememberedGames);
+      const gameCount = this.renderGames(games, rememberedGames);
       if (this.shouldShowGamePicker()) {
         this.setStatus(
           gameCount ? "Choose a waiting game." : "No games."
@@ -320,11 +333,9 @@ const Multiplayer = {
   },
 
   async resumeGame(gameId) {
-    const connection = this.connectedGames().find((game) => game.id === gameId);
-    if (!connection) {
-      this.setStatus("Game connection not found.");
-      return;
-    }
+    const rememberedConnection = this.connectedGames().find(
+      (game) => game.id === gameId
+    );
     try {
       this.closeEvents();
       const gameData = await this.request(`/games/${gameId}`);
@@ -332,6 +343,12 @@ const Multiplayer = {
         this.forgetConnection(gameId);
         this.setStatus("Game is already finished.");
         await this.refreshGames();
+        return;
+      }
+      const connection =
+        rememberedConnection || this.connectionForGame(gameData);
+      if (!connection) {
+        this.setStatus("Game connection not found.");
         return;
       }
       this.joinLocal(gameData, connection.playerId, connection.color);
@@ -562,6 +579,12 @@ const Multiplayer = {
     const list = document.getElementById("multiplayerGames");
     const select = document.getElementById("onlineGamesSelect");
     const connectedIds = new Set(this.connectedGames().map((game) => game.id));
+    const resumableServerGames = games.filter(
+      (gameData) =>
+        gameData.id !== this.currentGame?.id &&
+        gameData.status !== "finished" &&
+        this.isPlayerInGame(gameData)
+    );
     const joinableGames = games.filter(
       (gameData) =>
         gameData.id !== this.currentGame?.id &&
@@ -573,7 +596,7 @@ const Multiplayer = {
         gameData.players.white?.name !== this.userName
     );
     const rememberedById = new Map(
-      rememberedGames
+      [...rememberedGames, ...resumableServerGames]
         .filter((gameData) => gameData.id !== this.currentGame?.id)
         .map((gameData) => [gameData.id, gameData])
     );
@@ -674,6 +697,30 @@ const Multiplayer = {
     const black = gameData.players.black?.name || "Waiting";
     const state = gameData.status === "active" ? "active" : "waiting";
     return `Resume ${white} vs ${black} (${state})`;
+  },
+
+  isPlayerInGame(gameData) {
+    return Boolean(this.connectionForGame(gameData));
+  },
+
+  connectionForGame(gameData) {
+    const colors = ["white", "black"];
+    const color = colors.find((candidateColor) => {
+      const player = gameData.players?.[candidateColor];
+      return (
+        player &&
+        ((this.playerId && player.id === this.playerId) ||
+          (this.userName && player.name === this.userName))
+      );
+    });
+    if (!color) {
+      return undefined;
+    }
+    return {
+      id: gameData.id,
+      playerId: gameData.players[color].id,
+      color,
+    };
   },
 
   setStatus(message) {
