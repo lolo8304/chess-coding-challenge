@@ -413,6 +413,8 @@ class LegalMoves {
 
   generateCastlingKings(newMoves, startIndex, piece, color) {
     if (this.boardData.history.hasMoved(piece)) return;
+    const homeRank = color === Piece.WHITE ? 7 : 0;
+    if (Math.floor(startIndex / ROW_CELLS) !== homeRank) return;
     const opponentColor = color ^ Piece.COLOR_MASK;
 
     const castlingOptions = this.getCastlingOptions(piece, color);
@@ -422,6 +424,7 @@ class LegalMoves {
       targetIndex: color === Piece.WHITE ? 58 : 2,
       rookStartIndex: this.boardData.castlingRookStartIndexes[color].long,
       rookTargetIndex: color === Piece.WHITE ? 59 : 3,
+      color,
       opponentColor,
     });
     this.addCastlingMove(newMoves, {
@@ -430,6 +433,7 @@ class LegalMoves {
       targetIndex: color === Piece.WHITE ? 62 : 6,
       rookStartIndex: this.boardData.castlingRookStartIndexes[color].short,
       rookTargetIndex: color === Piece.WHITE ? 61 : 5,
+      color,
       opponentColor,
     });
   }
@@ -442,10 +446,27 @@ class LegalMoves {
       targetIndex,
       rookStartIndex,
       rookTargetIndex,
+      color,
       opponentColor,
     }
   ) {
     if (!possible) return;
+    if (rookStartIndex === undefined) return;
+
+    const kingPiece = Piece.KING | color;
+    const rookPiece = Piece.ROOK | color;
+    if (this.boardData.getPiece(startIndex) !== kingPiece) return;
+    if (this.boardData.getPiece(rookStartIndex) !== rookPiece) return;
+
+    const homeRank = color === Piece.WHITE ? 7 : 0;
+    if (
+      Math.floor(startIndex / ROW_CELLS) !== homeRank ||
+      Math.floor(rookStartIndex / ROW_CELLS) !== homeRank ||
+      Math.floor(targetIndex / ROW_CELLS) !== homeRank ||
+      Math.floor(rookTargetIndex / ROW_CELLS) !== homeRank
+    ) {
+      return;
+    }
 
     const minKingRook = Math.min(startIndex, rookStartIndex);
     const maxKingRook = Math.max(startIndex, rookStartIndex);

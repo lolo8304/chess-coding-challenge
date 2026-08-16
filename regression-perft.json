@@ -269,6 +269,35 @@
       ]
     },
     {
+      "name": "chat-invalid-g8g8-castling-notation-queen-check",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "Q1b3kr/5p1p/p2bq1p1/1pp5/8/4P3/PPP1P1PP/R3KB1R b KQk - 1 1",
+      "expectedRootMovesExclude": [
+        "g8g8"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 32,
+          "captures": 3,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 1
+        },
+        {
+          "depth": 2,
+          "nodes": 852,
+          "captures": 71,
+          "ep": 0,
+          "castles": 29,
+          "promotions": 0,
+          "checks": 27
+        }
+      ]
+    },
+    {
       "name": "chat-stale-e1g1-castling-without-rights",
       "variant": "standard",
       "source": "chat-history",
@@ -286,6 +315,125 @@
           "depth": 2,
           "nodes": 1422,
           "castles": 0
+        }
+      ]
+    },
+    {
+      "name": "chat-invalid-e2c2-castling-notation",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "1rbqkb1r/pppp1ppp/2n5/2PNpn2/1P1P4/P3PNP1/1Q2KPBP/R6R w KQk - 2 2",
+      "expectedRootMovesExclude": [
+        "e2c2"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 46,
+          "captures": 3,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 2
+        },
+        {
+          "depth": 2,
+          "nodes": 1411,
+          "captures": 318,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 122
+        }
+      ]
+    },
+    {
+      "name": "chat-invalid-d1g1-castling-notation",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "r1b1k2r/ppnp1ppp/3bp3/8/2R1P3/3P4/P2N2PP/3K3R w Kkq - 2 2",
+      "expectedRootMovesExclude": [
+        "d1g1"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 28,
+          "captures": 1,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 0
+        },
+        {
+          "depth": 2,
+          "nodes": 832,
+          "captures": 32,
+          "ep": 0,
+          "castles": 28,
+          "promotions": 0,
+          "checks": 2
+        }
+      ]
+    },
+    {
+      "name": "chat-valid-black-castling-from-e8",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "r3k2r/pp2q2p/2pb4/4nb2/B2QPp2/8/PPPP1PPP/1RB1K2R b Kkq - 0 1",
+      "expectedRootMovesContain": [
+        "e8c8",
+        "e8g8"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 47,
+          "captures": 1,
+          "ep": 0,
+          "castles": 2,
+          "promotions": 0,
+          "checks": 2
+        },
+        {
+          "depth": 2,
+          "nodes": 1497,
+          "captures": 215,
+          "ep": 0,
+          "castles": 45,
+          "promotions": 0,
+          "checks": 69
+        }
+      ]
+    },
+    {
+      "name": "chat-valid-black-king-c8c7-escape",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "2k2R2/8/2b1K3/7r/2PP3P/1Pr5/4PP1P/1Rb2B2 b - - 18 10",
+      "expectedRootMovesContain": [
+        "c6e8",
+        "c8b7",
+        "c8c7"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 3,
+          "captures": 0,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 0
+        },
+        {
+          "depth": 2,
+          "nodes": 81,
+          "captures": 4,
+          "ep": 0,
+          "castles": 0,
+          "promotions": 0,
+          "checks": 5
         }
       ]
     },
