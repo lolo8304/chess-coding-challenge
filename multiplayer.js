@@ -13,6 +13,13 @@ const Multiplayer = {
   finishReported: false,
   registrationPromise: undefined,
   enabled: false,
+  socketKeepAliveTimeoutMs: 3000,
+  socketKeepAliveCheckMs: 1000,
+  connectionMaxAgeMs: 24 * 60 * 60 * 1000,
+  gameSocketLastMessageAt: 0,
+  gameSocketKeepAliveTimer: undefined,
+  gamesListSocketLastMessageAt: 0,
+  gamesListSocketKeepAliveTimer: undefined,
 
   init() {
     this.userName =
@@ -20,11 +27,18 @@ const Multiplayer = {
         ? ensureChessUserName()
         : "Player1";
     this.renderUserName();
-    this.registrationPromise = this.registerUserName().catch((error) => {
-      this.setStatus(`Player registration failed: ${error.message}`);
-      this.registrationPromise = undefined;
-      return undefined;
-    });
+    this.registrationPromise = this.registerUserName()
+      .catch((error) => {
+        this.setStatus(`Player registration failed: ${error.message}`);
+        this.registrationPromise = undefined;
+        return undefined;
+      })
+      .then(async (registeredPlayer) => {
+        if (registeredPlayer) {
+          await this.pauseRememberedActiveGames();
+        }
+        return registeredPlayer;
+      });
   },
 
   isOnlineGame() {
@@ -147,6 +161,46 @@ const Multiplayer = {
     return this.userName;
   },
 
+  async editUserName(inputName) {
+    const currentPlayer = await this.ensureRegistered();
+    if (!currentPlayer?.id) {
+      this.setStatus("Register before changing your name.");
+      return undefined;
+    }
+    const rawName =
+      inputName === undefined
+        ? prompt("Choose your chess name", this.userName || "")
+        : inputName;
+    const baseName = String(rawName || "").trim();
+    if (!baseName) return undefined;
+
+    try {
+      const result = await this.request("/players/rename", {
+        method: "POST",
+        body: JSON.stringify({
+          playerId: currentPlayer.id,
+          name: baseName,
+        }),
+      });
+      if (result?.player) {
+        this.userName = result.player.name;
+        window.localStorage.setItem(this.playerIdStorageKey, result.player.id);
+        if (typeof setChessUserName === "function") {
+          setChessUserName(result.player.name);
+        }
+        this.registrationPromise = Promise.resolve(result.player);
+        this.renderUserName();
+        this.setStatus(`User changed to ${result.player.name}.`);
+        return result.player;
+      }
+    } catch (error) {
+      this.setStatus(`User change failed: ${error.message}`);
+      return undefined;
+    }
+    this.setStatus("Could not change user name.");
+    return undefined;
+  },
+
   async ensureRegistered() {
     const registeredPlayer = this.registrationPromise
       ? await this.registrationPromise
@@ -222,6 +276,7 @@ const Multiplayer = {
   },
 
   leaveGame() {
+    this.pauseCurrentGame();
     this.closeGameUpdates();
     this.closeGamesList();
     this.enabled = false;
@@ -231,6 +286,48 @@ const Multiplayer = {
     this.finishReported = false;
     this.renderCurrentGame();
     this.setStatus("Not connected.");
+  },
+
+  pauseCurrentGame() {
+    if (
+      !this.currentGame ||
+      this.currentGame.status !== "active" ||
+      !this.playerId
+    ) {
+      return;
+    }
+    const gameId = this.currentGame.id;
+    const playerId = this.playerId;
+    this.request(`/games/${gameId}/pause`, {
+      method: "POST",
+      body: JSON.stringify({ playerId }),
+    }).catch(() => undefined);
+  },
+
+  async pauseRememberedActiveGames() {
+    const connections = this.connectedGames();
+    for (const connection of connections) {
+      try {
+        const gameData = await this.request(`/games/${connection.id}`);
+        if (gameData.status === "finished") {
+          this.forgetConnection(connection.id);
+          continue;
+        }
+        if (!this.isRecentConnection(gameData)) {
+          this.forgetConnection(connection.id);
+          continue;
+        }
+        if (gameData.status !== "active") {
+          continue;
+        }
+        await this.request(`/games/${connection.id}/pause`, {
+          method: "POST",
+          body: JSON.stringify({ playerId: connection.playerId }),
+        });
+      } catch (error) {
+        this.setStatus(`Stored game check failed: ${error.message}`);
+      }
+    }
   },
 
   applyPlayerTypesForConnection(color) {
@@ -252,10 +349,18 @@ const Multiplayer = {
     this.closeGameUpdates();
     if (typeof WebSocket === "undefined") return;
     const socket = new WebSocket(this.gameUpdatesUrl(gameId));
+    this.watchGameSocket(socket, gameId);
     socket.onmessage = (event) => this.applyGameMessage(event.data, gameId);
     socket.onclose = () => {
       if (this.gameSocket === socket) {
+        this.clearGameSocketWatch();
         this.gameSocket = undefined;
+        if (
+          this.currentGame?.id === gameId &&
+          this.currentGame.status !== "finished"
+        ) {
+          setTimeout(() => this.connectGameUpdates(gameId), 250);
+        }
       }
     };
     socket.onerror = () => {
@@ -265,6 +370,7 @@ const Multiplayer = {
   },
 
   closeGameUpdates() {
+    this.clearGameSocketWatch();
     if (this.gameSocket) {
       this.gameSocket.close();
       this.gameSocket = undefined;
@@ -274,6 +380,8 @@ const Multiplayer = {
   applyGameMessage(data, gameId) {
     try {
       const message = JSON.parse(data);
+      this.gameSocketLastMessageAt = Date.now();
+      if (message.type === "keep-alive") return;
       if (message.type !== "game" || !message.game) return;
       if (this.currentGame?.id === gameId) {
         this.applyGame(message.game);
@@ -290,10 +398,15 @@ const Multiplayer = {
     if (!this.shouldShowGamePicker() || this.gamesListSocket) return;
     if (typeof WebSocket === "undefined") return;
     const socket = new WebSocket(this.gamesListUrl());
+    this.watchGamesListSocket(socket);
     socket.onmessage = (event) => this.applyGamesListMessage(event.data);
     socket.onclose = () => {
       if (this.gamesListSocket === socket) {
+        this.clearGamesListSocketWatch();
         this.gamesListSocket = undefined;
+        if (this.shouldShowGamePicker()) {
+          setTimeout(() => this.connectGamesList(), 250);
+        }
       }
     };
     socket.onerror = () => {
@@ -303,6 +416,7 @@ const Multiplayer = {
   },
 
   closeGamesList() {
+    this.clearGamesListSocketWatch();
     if (this.gamesListSocket) {
       this.gamesListSocket.close();
       this.gamesListSocket = undefined;
@@ -349,6 +463,8 @@ const Multiplayer = {
   async applyGamesListMessage(data) {
     try {
       const message = JSON.parse(data);
+      this.gamesListSocketLastMessageAt = Date.now();
+      if (message.type === "keep-alive") return;
       if (message.type !== "games" || !Array.isArray(message.games)) return;
       const rememberedGames = await this.loadRememberedUnfinishedGames();
       const gameCount = this.renderGames(message.games, rememberedGames);
@@ -360,6 +476,75 @@ const Multiplayer = {
     } catch (error) {
       this.setStatus(`Live game list error: ${error.message}`);
     }
+  },
+
+  watchGameSocket(socket, gameId) {
+    this.clearGameSocketWatch();
+    this.gameSocketLastMessageAt = Date.now();
+    this.gameSocketKeepAliveTimer = setInterval(() => {
+      if (this.gameSocket !== socket) {
+        this.clearGameSocketWatch();
+        return;
+      }
+      if (
+        Date.now() - this.gameSocketLastMessageAt <=
+        this.socketKeepAliveTimeoutMs
+      ) {
+        return;
+      }
+      this.setStatus("Game update connection lost. Reconnecting...");
+      this.clearGameSocketWatch();
+      this.gameSocket = undefined;
+      socket.close();
+      if (
+        this.currentGame?.id === gameId &&
+        this.currentGame.status !== "finished"
+      ) {
+        this.connectGameUpdates(gameId);
+      }
+    }, this.socketKeepAliveCheckMs);
+    if (this.gameSocketKeepAliveTimer.unref) {
+      this.gameSocketKeepAliveTimer.unref();
+    }
+  },
+
+  clearGameSocketWatch() {
+    if (!this.gameSocketKeepAliveTimer) return;
+    clearInterval(this.gameSocketKeepAliveTimer);
+    this.gameSocketKeepAliveTimer = undefined;
+  },
+
+  watchGamesListSocket(socket) {
+    this.clearGamesListSocketWatch();
+    this.gamesListSocketLastMessageAt = Date.now();
+    this.gamesListSocketKeepAliveTimer = setInterval(() => {
+      if (this.gamesListSocket !== socket) {
+        this.clearGamesListSocketWatch();
+        return;
+      }
+      if (
+        Date.now() - this.gamesListSocketLastMessageAt <=
+        this.socketKeepAliveTimeoutMs
+      ) {
+        return;
+      }
+      this.setStatus("Live game list connection lost. Reconnecting...");
+      this.clearGamesListSocketWatch();
+      this.gamesListSocket = undefined;
+      socket.close();
+      if (this.shouldShowGamePicker()) {
+        this.connectGamesList();
+      }
+    }, this.socketKeepAliveCheckMs);
+    if (this.gamesListSocketKeepAliveTimer.unref) {
+      this.gamesListSocketKeepAliveTimer.unref();
+    }
+  },
+
+  clearGamesListSocketWatch() {
+    if (!this.gamesListSocketKeepAliveTimer) return;
+    clearInterval(this.gamesListSocketKeepAliveTimer);
+    this.gamesListSocketKeepAliveTimer = undefined;
   },
 
   async resumeGame(gameId) {
@@ -381,7 +566,16 @@ const Multiplayer = {
         this.setStatus("Game connection not found.");
         return;
       }
-      this.joinLocal(gameData, connection.playerId, connection.color);
+      const resumedGame =
+        gameData.status === "paused"
+          ? (
+              await this.request(`/games/${gameId}/resume`, {
+                method: "POST",
+                body: JSON.stringify({ playerId: connection.playerId }),
+              })
+            ).game
+          : gameData;
+      this.joinLocal(resumedGame, connection.playerId, connection.color);
     } catch (error) {
       this.setStatus(`Resume failed: ${error.message}`);
     }
@@ -543,6 +737,16 @@ const Multiplayer = {
     return `${winner.toUpperCase()} won - ${reason}`;
   },
 
+  connectionPlayersLabel(white, black) {
+    return `${white} (white) vs.\n${black} (black)`;
+  },
+
+  opponentLabel(white, black) {
+    if (this.color === "white") return `${black} (black)`;
+    if (this.color === "black") return `${white} (white)`;
+    return this.connectionPlayersLabel(white, black);
+  },
+
   renderUserName() {
     ["multiplayerUser", "multiplayerModeName"].forEach((id) => {
       const userElement = document.getElementById(id);
@@ -560,12 +764,12 @@ const Multiplayer = {
         currentElement.textContent = "No online game.";
       }
       if (playNamesElement) {
-        playNamesElement.textContent = "";
+        this.clearConnectionLabel(playNamesElement);
         playNamesElement.classList.remove("active");
       }
       const select = document.getElementById("onlineGamesSelect");
       if (select) {
-        select.classList.remove("active");
+        select.classList.toggle("active", this.shouldShowGamePicker());
       }
       const newGameButton = document.getElementById("onlineNewGameButton");
       if (newGameButton) {
@@ -576,22 +780,28 @@ const Multiplayer = {
     const white = this.currentGame.players.white?.name || "Waiting";
     const black = this.currentGame.players.black?.name || "Waiting";
     const isWaitingForOpponent = this.currentGame.status === "waiting";
+    const isPaused = this.currentGame.status === "paused";
     const isFinished = this.currentGame.status === "finished";
-    const whiteLabel = this.color === "white" ? `${white} (white)` : white;
-    const blackLabel = this.color === "black" ? `${black} (black)` : black;
+    const playersLabel = this.opponentLabel(white, black);
     const label = isWaitingForOpponent
       ? `${this.userName || white} - waiting ...`
+      : isPaused
+      ? `${playersLabel} - paused`
       : isFinished
-      ? `${whiteLabel} vs ${blackLabel} - ${this.finishedText(this.currentGame)}`
-      : `${whiteLabel} vs ${blackLabel}`;
+      ? `${playersLabel} - ${this.finishedText(this.currentGame)}`
+      : playersLabel;
     if (currentElement) {
       currentElement.textContent =
-        isWaitingForOpponent || isFinished
+        isWaitingForOpponent || isPaused || isFinished
           ? `${this.currentGame.id} | ${label}`
           : `${this.currentGame.id} | ${label} | ${this.currentGame.turn} to move`;
     }
     if (playNamesElement) {
-      playNamesElement.textContent = label;
+      this.renderConnectionLabel(
+        playNamesElement,
+        label,
+        this.isConnectionLive()
+      );
       playNamesElement.title = label;
       playNamesElement.classList.add("active");
     }
@@ -609,13 +819,16 @@ const Multiplayer = {
     const list = document.getElementById("multiplayerGames");
     const select = document.getElementById("onlineGamesSelect");
     const connectedIds = new Set(this.connectedGames().map((game) => game.id));
-    const resumableServerGames = games.filter(
+    const recentGames = games.filter((gameData) =>
+      this.isRecentConnection(gameData)
+    );
+    const resumableServerGames = recentGames.filter(
       (gameData) =>
         gameData.id !== this.currentGame?.id &&
         gameData.status !== "finished" &&
         this.isPlayerInGame(gameData)
     );
-    const joinableGames = games.filter(
+    const joinableGames = recentGames.filter(
       (gameData) =>
         gameData.id !== this.currentGame?.id &&
         !connectedIds.has(gameData.id) &&
@@ -627,21 +840,28 @@ const Multiplayer = {
     );
     const rememberedById = new Map(
       [...rememberedGames, ...resumableServerGames]
-        .filter((gameData) => gameData.id !== this.currentGame?.id)
+        .filter(
+          (gameData) =>
+            gameData.id !== this.currentGame?.id &&
+            this.isRecentConnection(gameData)
+        )
         .map((gameData) => [gameData.id, gameData])
     );
     const dropdownEntries = [
       ...joinableGames.map((gameData) => ({
         type: "join",
         game: gameData,
-        label: `Join ${gameData.players.white?.name || "White"}`,
+        label: this.joinLabel(gameData),
       })),
       ...[...rememberedById.values()].map((gameData) => ({
         type: "resume",
         game: gameData,
         label: this.resumeLabel(gameData),
       })),
-    ];
+    ].sort(
+      (left, right) =>
+        this.connectionAgeMs(left.game) - this.connectionAgeMs(right.game)
+    );
 
     if (list) {
       list.innerHTML = "";
@@ -677,6 +897,26 @@ const Multiplayer = {
     return dropdownEntries.length;
   },
 
+  isConnectionLive() {
+    return Boolean(this.currentGame?.status === "active" && this.gameSocket);
+  },
+
+  clearConnectionLabel(element) {
+    element.innerHTML = "";
+  },
+
+  renderConnectionLabel(element, label, isConnected) {
+    this.clearConnectionLabel(element);
+    const dot = document.createElement("span");
+    dot.className = `connection-status-dot ${
+      isConnected ? "connected" : "disconnected"
+    }`;
+    const text = document.createElement("span");
+    text.textContent = label;
+    element.appendChild(dot);
+    element.appendChild(text);
+  },
+
   async loadRememberedUnfinishedGames() {
     const connections = this.connectedGames();
     const games = [];
@@ -684,6 +924,8 @@ const Multiplayer = {
       try {
         const gameData = await this.request(`/games/${connection.id}`);
         if (gameData.status === "finished") {
+          this.forgetConnection(connection.id);
+        } else if (!this.isRecentConnection(gameData)) {
           this.forgetConnection(connection.id);
         } else {
           games.push(gameData);
@@ -723,10 +965,54 @@ const Multiplayer = {
   },
 
   resumeLabel(gameData) {
-    const white = gameData.players.white?.name || "White";
-    const black = gameData.players.black?.name || "Waiting";
-    const state = gameData.status === "active" ? "active" : "waiting";
-    return `Resume ${white} vs ${black} (${state})`;
+    return `Resume ${this.dropdownOpponentLabel(gameData)} - ${this.connectionAgeLabel(gameData)}`;
+  },
+
+  joinLabel(gameData) {
+    const white = this.shortPlayerName(gameData.players.white?.name || "White");
+    return `Join ${white} - ${this.connectionAgeLabel(gameData)}`;
+  },
+
+  dropdownOpponentLabel(gameData) {
+    const connection =
+      this.connectionForGame(gameData) ||
+      this.connectedGames().find((game) => game.id === gameData.id);
+    if (connection?.color === "white") {
+      return gameData.players.black?.name
+        ? `${this.shortPlayerName(gameData.players.black.name)} (black)`
+        : "Waiting";
+    }
+    if (connection?.color === "black") {
+      return gameData.players.white?.name
+        ? `${this.shortPlayerName(gameData.players.white.name)} (white)`
+        : "Waiting";
+    }
+    return this.shortPlayerName(gameData.players.white?.name || "Player");
+  },
+
+  shortPlayerName(name) {
+    return String(name || "").trim().slice(0, 10) || "Player";
+  },
+
+  isRecentConnection(gameData) {
+    const ageMs = this.connectionAgeMs(gameData);
+    return ageMs >= 0 && ageMs <= this.connectionMaxAgeMs;
+  },
+
+  connectionAgeMs(gameData) {
+    const createdAtMs = Date.parse(gameData?.createdAt || "");
+    if (!Number.isFinite(createdAtMs)) return Number.POSITIVE_INFINITY;
+    return Date.now() - createdAtMs;
+  },
+
+  connectionAgeLabel(gameData) {
+    const ageMs = Math.max(0, this.connectionAgeMs(gameData));
+    const minutes = Math.floor(ageMs / 60000);
+    if (minutes < 1) return "now";
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    return "24h+";
   },
 
   isPlayerInGame(gameData) {
@@ -806,4 +1092,8 @@ function joinSelectedOnlineGame(gameId) {
 
 function leaveOnlineGame() {
   Multiplayer.leaveGame();
+}
+
+function editOnlineUserName() {
+  Multiplayer.editUserName();
 }

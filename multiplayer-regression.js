@@ -166,6 +166,10 @@ function createRealEngineContext() {
 const context = vm.createContext({
   console,
   URL,
+  setTimeout,
+  clearTimeout,
+  setInterval,
+  clearInterval,
   FEN_start: "start-fen",
   Piece: { WHITE: 8, BLACK: 16, None: 0 },
   setComputerMode: () => {},
@@ -239,6 +243,11 @@ assert(
   "Expected localhost browsers to use the local game server API"
 );
 context.__Multiplayer.apiUrl = context.defaultChessApiUrl();
+
+const now = Date.now();
+function createdMinutesAgo(minutes) {
+  return new Date(now - minutes * 60 * 1000).toISOString();
+}
 
 context.__Multiplayer.currentGame = {
   id: "game-1",
@@ -431,11 +440,13 @@ const joinableCount = context.__Multiplayer.renderGames([
   {
     id: "game-2",
     status: "waiting",
+    createdAt: createdMinutesAgo(30),
     players: { white: { name: "OtherGame2" } },
   },
   {
     id: "game-3",
     status: "active",
+    createdAt: createdMinutesAgo(10),
     players: {
       white: { name: "ConnectedWhite" },
       black: { name: "ConnectedBlack" },
@@ -448,6 +459,10 @@ assert(select.children.length === 2, "Expected placeholder and one game option")
 assert(
   select.children[1].value === "join:game-2",
   "Expected dropdown to list the joinable game"
+);
+assert(
+  select.children[1].textContent === "Join OtherGame2 - 30m",
+  "Expected dropdown label to include compact age text"
 );
 assert(
   select.classNames.has("active"),
@@ -464,23 +479,69 @@ context.__Multiplayer.currentGame = {
   },
 };
 context.__Multiplayer.color = "black";
+context.__Multiplayer.gameSocket = { close() {} };
 context.__Multiplayer.renderCurrentGame();
 assert(
   !select.classNames.has("active"),
   "Expected dropdown to be hidden after an opponent connects"
 );
 assert(
-  elementForId("playPlayerNames").textContent === "OwnGame1 vs OtherGame2 (black)",
+  elementForId("playPlayerNames").children[0].className ===
+    "connection-status-dot connected",
+  "Expected active online games to show a green connection dot"
+);
+assert(
+  elementForId("playPlayerNames").children[1].textContent ===
+    "OwnGame1 (white)",
   "Expected player names to be displayed once the game starts"
 );
 
-context.__Multiplayer.currentGame.status = "finished";
+context.__Multiplayer.currentGame.status = "paused";
+context.__Multiplayer.renderCurrentGame();
+assert(
+  elementForId("playPlayerNames").children[0].className ===
+    "connection-status-dot disconnected",
+  "Expected paused online games to show a red connection dot"
+);
+assert(
+  elementForId("playPlayerNames").children[1].textContent ===
+    "OwnGame1 (white) - paused",
+  "Expected paused online games to display the paused state"
+);
+
+let pauseRequest;
+context.__Multiplayer.currentGame.status = "active";
+context.__Multiplayer.playerId = "player-1";
+context.__Multiplayer.request = (path, options = {}) => {
+  pauseRequest = { path, body: JSON.parse(options.body) };
+  return Promise.resolve({ game: { status: "paused" } });
+};
+context.__Multiplayer.leaveGame();
+assert(
+  pauseRequest?.path === "/games/game-1/pause",
+  "Expected leaving an active online game to pause it on the server"
+);
+assert(
+  pauseRequest.body.playerId === "player-1",
+  "Expected pause requests to include the local player id"
+);
+
+context.__Multiplayer.currentGame = {
+  id: "game-1",
+  status: "finished",
+  turn: "white",
+  players: {
+    white: { name: "OwnGame1" },
+    black: { name: "OtherGame2" },
+  },
+};
+context.__Multiplayer.color = "black";
 context.__Multiplayer.currentGame.winner = "white";
 context.__Multiplayer.currentGame.finishReason = "resignation";
 context.__Multiplayer.renderCurrentGame();
 assert(
-  elementForId("playPlayerNames").textContent ===
-    "OwnGame1 vs OtherGame2 (black) - WHITE won - resignation",
+  elementForId("playPlayerNames").children[1].textContent ===
+    "OwnGame1 (white) - WHITE won - resignation",
   "Expected finished online games to display winner and reason"
 );
 
@@ -491,18 +552,27 @@ const resumeCount = context.__Multiplayer.renderGames(
     {
       id: "game-2",
       status: "waiting",
+      createdAt: createdMinutesAgo(10),
       players: { white: { name: "OtherGame2" } },
     },
     {
       id: "game-5",
       status: "waiting",
+      createdAt: createdMinutesAgo(30),
       players: { white: { name: "OwnStartedGame" } },
+    },
+    {
+      id: "old-game",
+      status: "waiting",
+      createdAt: createdMinutesAgo(25 * 60),
+      players: { white: { name: "OldGame" } },
     },
   ],
   [
     {
       id: "game-4",
       status: "active",
+      createdAt: createdMinutesAgo(120),
       players: {
         white: { name: "SavedWhite" },
         black: { name: "SavedBlack" },
@@ -511,6 +581,7 @@ const resumeCount = context.__Multiplayer.renderGames(
     {
       id: "game-5",
       status: "waiting",
+      createdAt: createdMinutesAgo(30),
       players: {
         white: { name: "OwnStartedGame" },
       },
@@ -519,12 +590,28 @@ const resumeCount = context.__Multiplayer.renderGames(
 );
 assert(resumeCount === 3, "Expected joinable and remembered unfinished games");
 assert(
-  select.children[2].value === "resume:game-4",
-  "Expected remembered unfinished games to be resumable from the dropdown"
+  select.children[1].value === "join:game-2",
+  "Expected newest connection to be first in the dropdown"
 );
 assert(
-  select.children[3].value === "resume:game-5",
+  select.children[2].value === "resume:game-5",
   "Expected own started games to be resumed, not joined"
+);
+assert(
+  select.children[2].textContent === "Resume Waiting - 30m",
+  "Expected waiting resume dropdown labels not to show the local player"
+);
+assert(
+  select.children[3].value === "resume:game-4",
+  "Expected older remembered unfinished games after newer connections"
+);
+assert(
+  select.children[3].textContent === "Resume SavedBlack (black) - 2h",
+  "Expected resume dropdown labels to show only the opponent"
+);
+assert(
+  !select.children.some((child) => child.value === "join:old-game"),
+  "Expected games older than 24h to be excluded from the dropdown"
 );
 
 context.__Multiplayer.request = async () => ({
@@ -543,6 +630,90 @@ context.__Multiplayer.request = async () => ({
 });
 
 (async () => {
+  let refreshPauseRequest;
+  storage.set(
+    context.__Multiplayer.connectedGamesStorageKey,
+    JSON.stringify([
+      { id: "refresh-game", playerId: "player-refresh", color: "white" },
+    ])
+  );
+  context.__Multiplayer.request = async (path, options = {}) => {
+    if (path === "/games/refresh-game") {
+      return {
+        id: "refresh-game",
+        status: "active",
+        turn: "white",
+        fen: "refresh-fen",
+        createdAt: createdMinutesAgo(1),
+        players: {
+          white: { id: "player-refresh", name: "LocalWhite" },
+          black: { id: "player-opponent", name: "RemoteBlack" },
+        },
+        moves: [],
+      };
+    }
+    if (path === "/games/refresh-game/pause") {
+      refreshPauseRequest = { path, body: JSON.parse(options.body) };
+      return { game: { id: "refresh-game", status: "paused" } };
+    }
+    throw new Error(`unexpected request ${path}`);
+  };
+  await context.__Multiplayer.pauseRememberedActiveGames();
+  assert(
+    refreshPauseRequest?.path === "/games/refresh-game/pause",
+    "Expected remembered active games to be paused after a page refresh"
+  );
+  assert(
+    refreshPauseRequest.body.playerId === "player-refresh",
+    "Expected refresh pause requests to use the remembered player id"
+  );
+
+  let resumeRequest;
+  context.__Multiplayer.rememberConnection("paused-game", "player-white", "white");
+  context.__Multiplayer.request = async (path, options = {}) => {
+    if (path === "/games/paused-game") {
+      return {
+        id: "paused-game",
+        status: "paused",
+        turn: "white",
+        fen: "paused-fen",
+        createdAt: createdMinutesAgo(15),
+        players: {
+          white: { id: "player-white", name: "SavedWhite" },
+          black: { id: "player-black", name: "SavedBlack" },
+        },
+        moves: [],
+      };
+    }
+    if (path === "/games/paused-game/resume") {
+      resumeRequest = { path, body: JSON.parse(options.body) };
+      return {
+        game: {
+          id: "paused-game",
+          status: "active",
+          turn: "white",
+          fen: "paused-fen",
+          createdAt: createdMinutesAgo(15),
+          players: {
+            white: { id: "player-white", name: "SavedWhite" },
+            black: { id: "player-black", name: "SavedBlack" },
+          },
+          moves: [],
+        },
+      };
+    }
+    throw new Error(`unexpected request ${path}`);
+  };
+  await context.__Multiplayer.resumeGame("paused-game");
+  assert(
+    resumeRequest?.path === "/games/paused-game/resume",
+    "Expected reconnecting to a paused game to resume it on the server"
+  );
+  assert(
+    resumeRequest.body.playerId === "player-white",
+    "Expected resume requests to include the remembered player id"
+  );
+
   let registrationCalls = 0;
   context.__Multiplayer.userName = userName;
   context.__Multiplayer.request = async (path) => {
@@ -624,6 +795,35 @@ context.__Multiplayer.request = async () => ({
     "Expected fresh player id when server pair does not match local storage"
   );
 
+  context.__Multiplayer.registrationPromise = Promise.resolve({
+    id: "fresh-mismatch-player",
+    name: "Mismatch3333",
+  });
+  let renameRequest;
+  context.__Multiplayer.request = async (path, options) => {
+    if (path === "/players/rename") {
+      renameRequest = { path, body: JSON.parse(options.body) };
+      return { player: { id: "fresh-mismatch-player", name: "Rename5555" } };
+    }
+    throw new Error("unexpected request");
+  };
+  const renamed = await context.__Multiplayer.editUserName("Rename");
+  assert(
+    renameRequest?.path === "/players/rename" &&
+      renameRequest.body.playerId === "fresh-mismatch-player" &&
+      renameRequest.body.name === "Rename",
+    "Expected edited user names to be delegated to the API rename endpoint"
+  );
+  assert(
+    renamed.name === "Rename5555",
+    "Expected edited user name to use the API-selected name"
+  );
+  assert(
+    storage.get("chessPlayerId") === "fresh-mismatch-player" &&
+      storage.get("chessUserName") === renamed.name,
+    "Expected edited user name and player id to be stored"
+  );
+
   let createdByModeStart = false;
   context.__Multiplayer.currentGame = undefined;
   context.__Multiplayer.playerId = undefined;
@@ -633,7 +833,7 @@ context.__Multiplayer.request = async () => ({
     if (path === "/games" && options.method === "POST") {
       createdByModeStart = true;
     }
-    if (path === "/games") {
+    if (path === "/games" || path.startsWith("/games?")) {
       return [];
     }
     throw new Error(`unexpected request ${path}`);
@@ -678,8 +878,9 @@ context.__Multiplayer.request = async () => ({
   };
   await context.__Multiplayer.startOnlineGame();
   assert(
-    openedGamesListUrl ===
-      "ws://localhost:3000/games/ws?apiKey=vpFJPgzELLUXHhgJ2234cTBtoPvamwU4",
+    openedGamesListUrl.startsWith(
+      "ws://localhost:3000/games/ws?apiKey=vpFJPgzELLUXHhgJ2234cTBtoPvamwU4"
+    ),
     "Expected online mode to open the live games list WebSocket"
   );
   await context.__Multiplayer.applyGamesListMessage(
@@ -689,6 +890,7 @@ context.__Multiplayer.request = async () => ({
         {
           id: "live-game",
           status: "waiting",
+          createdAt: createdMinutesAgo(5),
           players: { white: { name: "RemoteWhite" } },
         },
       ],
@@ -713,6 +915,61 @@ context.__Multiplayer.request = async () => ({
     gamesListSocket.closed,
     "Expected live games list WebSocket to close once a game is connected"
   );
+
+  const originalSocketTimeout = context.__Multiplayer.socketKeepAliveTimeoutMs;
+  const originalSocketCheck = context.__Multiplayer.socketKeepAliveCheckMs;
+  context.__Multiplayer.socketKeepAliveTimeoutMs = 5;
+  context.__Multiplayer.socketKeepAliveCheckMs = 1;
+  const staleGameSockets = [];
+  context.WebSocket = function WebSocket(url) {
+    this.url = url;
+    this.close = () => {
+      this.closed = true;
+    };
+    staleGameSockets.push(this);
+  };
+  context.__Multiplayer.currentGame = {
+    id: "stale-game",
+    status: "active",
+    turn: "white",
+  };
+  context.__Multiplayer.connectGameUpdates("stale-game");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert(
+    staleGameSockets.length >= 2,
+    "Expected stale game update WebSocket to reconnect"
+  );
+  assert(
+    staleGameSockets[0].closed,
+    "Expected stale game update WebSocket to be closed"
+  );
+  context.__Multiplayer.closeGameUpdates();
+
+  const staleListSockets = [];
+  context.WebSocket = function WebSocket(url) {
+    this.url = url;
+    this.close = () => {
+      this.closed = true;
+    };
+    staleListSockets.push(this);
+  };
+  context.__Multiplayer.enabled = true;
+  context.__Multiplayer.currentGame = undefined;
+  context.__Multiplayer.playerId = undefined;
+  context.__Multiplayer.color = undefined;
+  context.__Multiplayer.connectGamesList();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert(
+    staleListSockets.length >= 2,
+    "Expected stale games list WebSocket to reconnect"
+  );
+  assert(
+    staleListSockets[0].closed,
+    "Expected stale games list WebSocket to be closed"
+  );
+  context.__Multiplayer.closeGamesList();
+  context.__Multiplayer.socketKeepAliveTimeoutMs = originalSocketTimeout;
+  context.__Multiplayer.socketKeepAliveCheckMs = originalSocketCheck;
 
   let explicitCreateRequest;
   context.game = {
