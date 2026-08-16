@@ -101,15 +101,15 @@
             cursor: pointer;
             display: inline-flex;
             flex: 0 0 auto;
-            height: 42px;
+            height: 38px;
             justify-content: center;
             padding: 0;
-            width: 42px;
+            width: 38px;
         }
 
         .console-toggle svg {
-            height: 24px;
-            width: 24px;
+            height: 22px;
+            width: 22px;
         }
 
         .computer-mode-button.active {
@@ -117,20 +117,12 @@
             border: 2px solid #7f9a63;
         }
 
-        .computer-mode-button[data-mode="ai-vs-ai"] {
-            margin-left: 12px;
-        }
-
-        .computer-mode-button[data-mode="human-vs-human"] {
-            margin-left: 12px;
-        }
-
         .icon-button {
             align-items: center;
             display: inline-flex;
-            height: 48px;
+            height: 42px;
             justify-content: center;
-            width: 48px;
+            width: 42px;
             padding: 0;
         }
 
@@ -172,7 +164,7 @@
 
         .online-games-select {
             display: none;
-            height: 48px;
+            height: 42px;
             max-width: min(42vw, 260px);
             min-width: 150px;
         }
@@ -184,7 +176,7 @@
         .online-new-game-button {
             display: none;
             font-weight: 700;
-            height: 48px;
+            height: 42px;
             white-space: nowrap;
         }
 
@@ -194,7 +186,7 @@
 
         #aiStrength {
             box-sizing: border-box;
-            height: 48px;
+            height: 42px;
             padding: 4px;
             width: 116px;
         }
@@ -347,8 +339,8 @@
             }
 
             .primary-control-row.play-controls .online-new-game-button {
-                flex: 0 0 48px;
-                max-width: 48px;
+                flex: 0 0 42px;
+                max-width: 42px;
             }
 
             .primary-control-row.play-controls .online-games-select {
@@ -477,6 +469,18 @@
             if (typeof Multiplayer !== "undefined") {
                 Multiplayer.leaveGame();
             }
+        }
+
+        function goHome() {
+            if (typeof Multiplayer !== "undefined") {
+                Multiplayer.leaveGame();
+            }
+            fen_hash = FEN_start;
+            resizeFinalize();
+            setupFen();
+            setComputerMode("white", true);
+            history.replaceState(null, "", window.location.pathname + window.location.search + "#");
+            window.location.reload();
         }
 
         async function resignGame() {
@@ -656,6 +660,16 @@
 		                    <span id="playPlayerNames" class="play-player-names"></span>
 	                    </div>
 	                    <div class="mode-control-row start-controls">
+	                        <button id="homeButton" class="icon-button" onclick="goHome(); return false" type="button"
+	                                aria-label="Home">
+	                            <svg class="mode-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
+	                                 viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+	                                 aria-hidden="true">
+	                                <path stroke-linecap="round" stroke-linejoin="round"
+	                                      d="m2.25 12 8.954-8.955a1.125 1.125 0 0 1 1.592 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
+	                            </svg>
+	                            <span class="visually-hidden">Home</span>
+	                        </button>
 	                        <button class="computer-mode-button icon-button active" data-mode="white"
 	                                onclick="setComputerMode('white'); return false" type="button" aria-label="White">
 	                            <span class="king-icon white-king-icon" aria-hidden="true"></span>
