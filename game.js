@@ -120,6 +120,7 @@ class Game {
       clockY,
       bannerTextColor
     );
+    this.drawCapturedPieces();
     if (!this.board.data.isFinished()) {
       if (this.time > 1.0) {
         const movedBlack = this.computerMoveNow(this.computerBlack, 0);
@@ -198,6 +199,74 @@ class Game {
     const clockHalfWidth = clockFontSize * 1.5;
     const alignedX = align === "left" ? x + clockHalfWidth : x - clockHalfWidth;
     text(label, alignedX, y);
+  }
+
+  capturedPieceFromMove(move) {
+    if (!move.isHit) return Piece.None;
+    if (move.enPassant !== undefined) {
+      const undoPiece = move.undoMove?.undoPiecesAtIndex.find(
+        (pieceAtIndex) => pieceAtIndex.index === move.enPassant
+      );
+      return undoPiece?.piece || Piece.None;
+    }
+    return move.targetPiece || Piece.None;
+  }
+
+  capturedPiecesForColor(color) {
+    return this.board.data.history.movesHistory
+      .map((move) => this.capturedPieceFromMove(move))
+      .filter((piece) => (piece & Piece.COLOR_MASK) === color)
+      .sort((a, b) => {
+        const aType = a & Piece.PIECES_MASK;
+        const bType = b & Piece.PIECES_MASK;
+        return getPieceTypeValue(bType) - getPieceTypeValue(aType);
+      });
+  }
+
+  drawCapturedPieces() {
+    const whiteCapturedPieces = this.capturedPiecesForColor(Piece.WHITE);
+    const blackCapturedPieces = this.capturedPiecesForColor(Piece.BLACK);
+    const maxPiecesPerSide = this.w <= 400
+      ? 15
+      : Math.max(whiteCapturedPieces.length, blackCapturedPieces.length, 1);
+    const sideWidth = this.w / 2 - 2 * this.padding;
+    const maxIconSize = Math.floor(sideWidth / maxPiecesPerSide) - 2;
+    const iconSize = Math.max(8, Math.min(14, maxIconSize));
+    const gap = 2;
+    const cellSize = iconSize + gap;
+    const y = this.y - iconSize - this.padding;
+
+    this.drawCapturedPieceRow(
+      whiteCapturedPieces,
+      this.x + this.padding,
+      y,
+      iconSize,
+      cellSize,
+      "left",
+      "black"
+    );
+    this.drawCapturedPieceRow(
+      blackCapturedPieces,
+      this.x + this.w - this.padding,
+      y,
+      iconSize,
+      cellSize,
+      "right",
+      "white"
+    );
+  }
+
+  drawCapturedPieceRow(pieces, x, y, iconSize, cellSize, align, backgroundColor) {
+    for (let i = 0; i < pieces.length; i++) {
+      const piece = pieces[i];
+      const isWhite = (piece & Piece.WHITE) > 0;
+      const pieceIndex =
+        (isWhite ? 0 : 1) * Piece.COUNT + (piece & Piece.PIECES_MASK) - 1;
+      const cellX = align === "left" ? x + i * cellSize : x - (i + 1) * cellSize;
+      fill(backgroundColor);
+      rect(cellX, y, iconSize, iconSize);
+      image(imgFigures[pieceIndex], cellX, y, iconSize, iconSize);
+    }
   }
 
   stopActiveClock() {
