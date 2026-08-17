@@ -717,6 +717,23 @@
             toggleElement.setAttribute('aria-expanded', String(!isCollapsed));
         }
     </script>
+
+	<script>
+		if (["localhost", "127.0.0.1"].includes(location.hostname)) {
+			const events = new EventSource("/events");
+
+			events.onmessage = event => {
+				console.log("File changed:", event.data);
+
+				location.href =
+						location.pathname + "?reload=" + Date.now();
+			};
+
+			events.onopen = () => {
+				console.log("Live reload connected");
+			};
+		}
+	</script>
 </head>
 
 <body class="body">
