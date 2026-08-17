@@ -93,7 +93,7 @@ class Game {
     }
     fill(bannerBackgroundColor);
     rect(this.x, this.y - this.paddingTop, this.w, this.paddingTop);
-    const fontSize = this.w > 600 ? 40 : this.w > 400 ? 30 : 20;
+    const fontSize = 20;
     const clockFontSize = this.w > 600 ? 22 : this.w > 400 ? 18 : 14;
     const bannerMiddleY =
       this.y - this.paddingTop + this.paddingTop / 2 + (fontSize - 10) / 2;
