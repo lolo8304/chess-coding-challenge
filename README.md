@@ -316,3 +316,5 @@ quit
 
 - [Coding Challenges](https://codingchallenges.fyi) for the challenge idea.
 - Sebastian Lague's chess-engine videos for engine-building inspiration.
+  - https://www.youtube.com/watch?v=U4ogK0MIzqk
+  - https://www.youtube.com/watch?v=_vqlIPDR2TU

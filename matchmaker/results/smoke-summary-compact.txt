@@ -1,0 +1,20 @@
+Matchmaker summary
+Version A: 1-baseline
+Version B: 2-compact-smoke
+Perspective: 1-baseline
+Games per color: 1
+Total games: 2
+Depth: 1
+Seed: 42
+Max plies: 2
+Fair positions: fair_positions.txt
+
+Wins: 0 (0.0%)
+Draws: 2 (100.0%)
+Losses: 0 (0.0%)
+Score: 50.0%
+
+A as white: 0-1-0
+A as black: 0-1-0
+Elapsed: 0.1 s
+Summary file: matchmaker/results/smoke-summary-compact.txt
