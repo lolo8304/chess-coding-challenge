@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "compact-smoke",
+  "createdAt": "2026-08-22T08:42:02.848Z",
+  "files": [
+    "board-pieces.js",
+    "history.js",
+    "zobrist-keys.js",
+    "zobrist.js",
+    "bit-board.js",
+    "transposition-table.js",
+    "board-moves.js",
+    "board-data.js",
+    "computerplayers.js"
+  ]
+}
