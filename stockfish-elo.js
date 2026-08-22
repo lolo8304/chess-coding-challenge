@@ -708,7 +708,30 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+let didNotifyResult = false;
+
+function notifyResult(success) {
+  didNotifyResult = true;
+  process.stderr.write(success ? "\u0007\u0007" : "\u0007\u0007\u0007\u0007");
+}
+
+if (require.main === module) {
+  process.on("exit", (code) => {
+    if (!didNotifyResult) notifyResult(code === 0);
+  });
+
+  main().then(() => {
+    notifyResult(true);
+  }).catch((error) => {
+    notifyResult(false);
+    console.error(error.message);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  createEngineContext,
+  loadEngine,
+  notifyResult,
+  runInEngine,
+};
