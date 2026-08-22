@@ -80,6 +80,17 @@ const TESTS = [
     initialGameColor: "black",
   },
   {
+    name: "invalid white castling rights from d2 are stripped for Stockfish",
+    fen: "1rb4r/pppp1ppp/3k4/6P1/P3P3/2P3P1/2PK1P2/R4B1R w KQ - 3 2",
+    depth: 3,
+    expectedSerializedFen:
+      "1rb4r/pppp1ppp/3k4/6P1/P3P3/2P3P1/2PK1P2/R4B1R w - - 3 2",
+    expectedLegalMoves: 33,
+    expectedAnyMove: true,
+    expectedMadeMove: true,
+    initialGameColor: "black",
+  },
+  {
     name: "ai move remains legal after search from rook check",
     fen: "r1b1RQ2/pp1p4/2k4p/2p5/5P2/8/r3K1P1/8 w - - 22 12",
     depth: 4,
@@ -321,6 +332,7 @@ function runSearchTest(test) {
           name: aiSearchTest.name,
           fen: aiSearchTest.fen,
           expectedMove: aiSearchTest.expectedMove,
+          expectedAnyMove: aiSearchTest.expectedAnyMove,
           actualMove: result.bestMove && result.bestMove.toCoordinateNotation(),
           expectedLegalMoves: aiSearchTest.expectedLegalMoves,
           expectedCount: aiSearchTest.expectedCount,
@@ -348,6 +360,7 @@ function runSearchTest(test) {
           actualTimedOut: result.timedOut,
           expectedMadeMove: aiSearchTest.expectedMadeMove,
           actualMadeMove: madeMove,
+          expectedSerializedFen: aiSearchTest.expectedSerializedFen,
           makeMoveError,
           legalMovesBefore,
           turn,
@@ -374,7 +387,21 @@ function assertEqual(failures, label, actual, expected) {
 
 function checkResult(result) {
   const failures = [];
-  assertEqual(failures, "best move", result.actualMove, result.expectedMove);
+  if (result.expectedAnyMove) {
+    if (!result.actualMove) {
+      failures.push("best move: expected any legal move, got undefined");
+    }
+  } else {
+    assertEqual(failures, "best move", result.actualMove, result.expectedMove);
+  }
+  if (result.expectedSerializedFen !== undefined) {
+    assertEqual(
+      failures,
+      "serialized FEN",
+      result.fenBefore,
+      result.expectedSerializedFen
+    );
+  }
   assertEqual(failures, "final FEN", result.fenAfter, result.fenBefore);
   assertEqual(failures, "final hash", result.hashAfter, result.hashBefore);
   assertEqual(

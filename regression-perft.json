@@ -5,7 +5,7 @@
     "generatedFrom": "https://chessprogramming.org/Chess960_Perft_Results",
     "chess960CaseCount": 960,
     "note": "Default regression depth is intentionally 2; higher Chess960 depths are stored for manual targeted runs.",
-    "chatHistoryCaseCount": 4
+    "chatHistoryCaseCount": 5
   },
   "cases": [
     {
@@ -344,6 +344,27 @@
           "castles": 0,
           "promotions": 0,
           "checks": 122
+        }
+      ]
+    },
+    {
+      "name": "chat-invalid-d2c2-castling-notation",
+      "variant": "standard",
+      "source": "chat-history",
+      "fen": "1rb4r/pppp1ppp/3k4/6P1/P3P3/2P3P1/2PK1P2/R4B1R w KQ - 3 2",
+      "expectedRootMovesExclude": [
+        "d2c2"
+      ],
+      "expectations": [
+        {
+          "depth": 1,
+          "nodes": 33,
+          "castles": 0
+        },
+        {
+          "depth": 2,
+          "nodes": 655,
+          "castles": 0
         }
       ]
     },
