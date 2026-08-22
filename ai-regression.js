@@ -100,6 +100,15 @@ const TESTS = [
     initialGameColor: "white",
   },
   {
+    name: "promotion check can be answered by capturing checker",
+    fen: "r1b2rk1/pp2qPp1/2p5/2n5/2Q5/4P3/PPP1KPPP/R1B4R b - - 0 1",
+    depth: 3,
+    expectedLegalMoves: 4,
+    expectedAnyMove: true,
+    expectedMadeMove: true,
+    initialGameColor: "white",
+  },
+  {
     name: "black capture keeps search state local",
     fen: "4r2k/8/8/8/8/8/4Q3/K7 b - - 0 1",
     depth: 3,
@@ -385,6 +394,17 @@ function assertEqual(failures, label, actual, expected) {
   }
 }
 
+let didNotifyResult = false;
+
+function notifyResult(success) {
+  didNotifyResult = true;
+  process.stderr.write(success ? "\u0007\u0007" : "\u0007\u0007\u0007\u0007");
+}
+
+process.on("exit", (code) => {
+  if (!didNotifyResult) notifyResult(code === 0);
+});
+
 function checkResult(result) {
   const failures = [];
   if (result.expectedAnyMove) {
@@ -510,9 +530,11 @@ function main() {
   }
 
   if (failed > 0) {
+    notifyResult(false);
     console.error(`${failed} AI regression test(s) failed.`);
     process.exit(1);
   }
+  notifyResult(true);
   console.log(`${TESTS.length} AI regression test(s) passed.`);
 }
 

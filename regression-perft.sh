@@ -49,6 +49,17 @@ const caseRange = process.env.CASE_RANGE || "";
 const fixture = JSON.parse(fs.readFileSync(fixtureJson, "utf8"));
 const statAliases = { captures: "hits", promotions: "prom" };
 
+let didNotifyResult = false;
+
+function notifyResult(success) {
+  didNotifyResult = true;
+  process.stderr.write(success ? "\u0007\u0007" : "\u0007\u0007\u0007\u0007");
+}
+
+process.on("exit", (code) => {
+  if (!didNotifyResult) notifyResult(code === 0);
+});
+
 function runPerft(depth, fen) {
   const output = execFileSync("node", [perftJs, String(depth), fen], {
     encoding: "utf8",
@@ -276,8 +287,10 @@ console.log(
   "\nChecked " + depthTargets + " depth targets across " + selectedCases.length + " cases."
 );
 if (failures > 0) {
+  notifyResult(false);
   console.error(failures + " regression target(s) failed.");
   process.exit(1);
 }
+notifyResult(true);
 console.log("All regression perft targets passed.");
 REGRESSION_NODE

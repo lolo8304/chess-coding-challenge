@@ -871,6 +871,7 @@ class LegalMoves {
 
   removePseudoIllegalMoves(movesToCheck) {
     if (movesToCheck.length === 0) return;
+    movesToCheck = this.uniqueCheckingAttacks(movesToCheck);
     const color = movesToCheck[0].color;
     this.checkAttackIndexes = [];
     const checkAttackLookup = [];
@@ -917,6 +918,25 @@ class LegalMoves {
     }
     verbose >= 2 && console.table(movesToKeep);
     this.moves = movesToKeep;
+  }
+
+  uniqueCheckingAttacks(movesToCheck) {
+    const uniqueMoves = [];
+    const seen = new Set();
+    for (const move of movesToCheck) {
+      const key = [
+        move.from,
+        move.to,
+        move.enPassant,
+        move.castlingKingTargetIndex,
+        move.castlingRookStartIndex,
+        move.castlingRookTargetIndex,
+      ].join(":");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      uniqueMoves.push(move);
+    }
+    return uniqueMoves;
   }
 }
 

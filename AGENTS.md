@@ -159,6 +159,13 @@ When working on AI:
 - run local perft using "./perft.sh 2 '<fen string>'
 - run stockfish perft using "./stockfish.sh 2 '<fen string>'"
 
+## Fixing illegal moves from games
+
+- try to reproduce this exact FEN through both paths: local move generation/perft (--nodes path) and the Elo bridge. 
+- That should tell us whether the illegal move comes from engine search state or from the Stockfish handoff/serialization layer.
+- after found the bug - add an additional regression test
+- also add regression tests for the stockfish handoff/bridge if needed
+
 ## Commit, Push, merge rules
 
 - use the existing main branch
