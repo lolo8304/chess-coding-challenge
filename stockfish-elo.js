@@ -13,7 +13,7 @@ function usage(exitCode = 1) {
 
 Options:
   --stockfish <path>        Stockfish binary path (default: stockfish)
-  --games <n>               Number of games to play (default: 2)
+  --games <n>               Number of games to play (default: 10)
   --engine-depth <n>        Your AI search depth, 1-7 (default: 4)
   --stockfish-elo <n>       Stockfish limited Elo opponent (default: 1320)
   --stockfish-movetime <ms> Stockfish time per move (default: 100)
@@ -38,7 +38,7 @@ Install Stockfish first if needed:
 function parseArgs(argv) {
   const options = {
     stockfish: "stockfish",
-    games: 2,
+    games: 10,
     engineDepth: 4,
     stockfishElo: 1320,
     stockfishMoveTimeMs: 100,

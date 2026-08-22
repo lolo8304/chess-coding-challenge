@@ -367,7 +367,20 @@ class LegalMoves {
   }
 
   getCastlingOptions(kingPiece, color) {
-    if (this.boardData.history.hasMoved(kingPiece))
+    const expectedKingPiece = Piece.KING | color;
+    const kingIndex =
+      kingPiece === expectedKingPiece
+        ? this.boardData.getKingPosition(color)
+        : kingPiece;
+    const homeRank = color === Piece.WHITE ? 7 : 0;
+    if (
+      kingIndex === undefined ||
+      Math.floor(kingIndex / ROW_CELLS) !== homeRank ||
+      this.boardData.getPiece(kingIndex) !== expectedKingPiece
+    ) {
+      return { long: false, short: false };
+    }
+    if (this.boardData.history.hasMoved(expectedKingPiece))
       return { long: false, short: false };
     const rookPiece = Piece.ROOK | color;
     const rookPositions = this.boardData.castlingRookStartIndexes[color];
